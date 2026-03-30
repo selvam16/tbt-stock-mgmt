@@ -15,6 +15,9 @@ export default function VehiclesListScreen() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [party, setParty] = useState<Party | null>(null);
   const [loading, setLoading] = useState(true);
+  const [vehicleQuantities, setVehicleQuantities] = useState<
+    Record<string, number>
+  >({});
 
   const loadData = useCallback(async () => {
     try {
@@ -26,6 +29,24 @@ export default function VehiclesListScreen() {
 
       const vehcls = await storage.getVehicles(partyId);
       setVehicles(vehcls);
+
+      // Calculate loaded quantities for each vehicle
+      const allGodownStocks = await storage.getGodownStocks();
+      const quantityMap: Record<string, number> = {};
+
+      vehcls.forEach((vehicle) => {
+        // Sum all quantities loaded (negative values) for this vehicle
+        const loadedQuantity = allGodownStocks
+          .filter(
+            (stock) =>
+              stock.vehicleNumber === vehicle.vehicleNumber &&
+              stock.loadedQuantity < 0,
+          )
+          .reduce((sum, stock) => sum + Math.abs(stock.loadedQuantity), 0);
+        quantityMap[vehicle.id] = loadedQuantity;
+      });
+
+      setVehicleQuantities(quantityMap);
     } catch (error) {
       console.error(error);
     } finally {
@@ -52,7 +73,12 @@ export default function VehiclesListScreen() {
   };
 
   const renderVehicleItem = ({ item }: { item: Vehicle }) => (
-    <VehicleCard vehicle={item} onDelete={handleVehicleDeleted} source="add" />
+    <VehicleCard
+      vehicle={item}
+      onDelete={handleVehicleDeleted}
+      source="add"
+      loadedQuantity={vehicleQuantities[item.id] || 0}
+    />
   );
 
   if (loading) {

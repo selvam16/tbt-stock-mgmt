@@ -14,7 +14,20 @@ import {
 
 export default function AddItemScreen() {
   const router = useRouter();
-  const { companyId, companyName, itemId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const companyId =
+    typeof params.companyId === "string"
+      ? params.companyId
+      : params.companyId?.[0];
+  const companyName =
+    typeof params.companyName === "string"
+      ? params.companyName
+      : params.companyName?.[0];
+  const itemId =
+    typeof params.itemId === "string" ? params.itemId : params.itemId?.[0];
+  const source = (
+    typeof params.source === "string" ? params.source : params.source?.[0]
+  ) as "add" | "unload" | undefined;
   const [loading, setLoading] = useState(itemId ? true : false);
   const [company, setCompany] = useState<Company | null>(null);
   const [isEditing] = useState(!!itemId);
@@ -95,19 +108,70 @@ export default function AddItemScreen() {
     try {
       const quantity = Number(formData.quantity);
       if (isEditing && itemId && typeof itemId === "string") {
+        // Get original item for quantity difference
+        const allItems = await storage.getItems();
+        const originalItem = allItems.find((i) => i.id === itemId);
+        const originalQuantity = originalItem?.quantity || 0;
+        const quantityDifference = quantity - originalQuantity;
+
+        // Update item
         await storage.updateItem(itemId, {
           itemName: formData.itemName.trim(),
           quantity,
         });
+
+        // If in unload mode, update godown stock with quantity difference
+        if (source === "unload" && company && quantityDifference !== 0) {
+          // Find existing godown stock entry for this item
+          const godownStocks = await storage.getGodownStocks(itemId);
+          const existingStock = godownStocks.find(
+            (s) => s.godownName === company.godownName,
+          );
+
+          if (existingStock) {
+            // Update existing stock entry by deleting and recreating with new quantity
+            await storage.deleteGodownStock(existingStock.id);
+            await storage.addGodownStock({
+              itemId: itemId,
+              godownName: company.godownName,
+              loadedQuantity: quantity, // Use new total quantity
+              vehicleNumber: existingStock.vehicleNumber,
+              date: existingStock.date,
+            });
+          } else if (quantityDifference > 0) {
+            // If no existing stock but quantity increased, add new stock entry
+            await storage.addGodownStock({
+              itemId: itemId,
+              godownName: company.godownName,
+              loadedQuantity: quantityDifference,
+              vehicleNumber: "Received",
+              date: new Date().toISOString().split("T")[0],
+            });
+          }
+        }
+
         Alert.alert("Success", "Item updated successfully", [
           { text: "OK", onPress: () => router.back() },
         ]);
       } else {
-        await storage.addItem({
+        // Add new item
+        const newItem = await storage.addItem({
           companyId,
           itemName: formData.itemName.trim(),
           quantity,
         });
+
+        // If in unload mode, automatically add to godown stock
+        if (source === "unload" && company) {
+          await storage.addGodownStock({
+            itemId: newItem.id,
+            godownName: company.godownName,
+            loadedQuantity: quantity, // Positive: stock entering godown
+            vehicleNumber: "Received",
+            date: new Date().toISOString().split("T")[0],
+          });
+        }
+
         Alert.alert("Success", "Item added successfully", [
           {
             text: "Add More",

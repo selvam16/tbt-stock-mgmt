@@ -33,12 +33,25 @@ export default function ItemCard({
           text: "Delete",
           onPress: async () => {
             try {
+              setLoading(true);
+
+              // If in unload mode, delete related godown stock entries
+              if (source === "unload") {
+                const godownStocks = await storage.getGodownStocks(item.id);
+                for (const stock of godownStocks) {
+                  await storage.deleteGodownStock(stock.id);
+                }
+              }
+
+              // Delete the item
               await storage.deleteItem(item.id);
               onDelete();
               Alert.alert("Success", "Item deleted successfully");
             } catch (error) {
               Alert.alert("Error", "Failed to delete item");
               console.error(error);
+            } finally {
+              setLoading(false);
             }
           },
           style: "destructive",
@@ -76,20 +89,28 @@ export default function ItemCard({
         return;
       }
 
-      // Add to godown stock
+      // Add to godown stock (shipment out = negative quantity for godown)
       await storage.addGodownStock({
         itemId: item.id,
         godownName: company.godownName,
-        loadedQuantity: quantity,
+        loadedQuantity: -quantity, // Negative because item is leaving
         vehicleNumber: vehicle.vehicleNumber,
         date: new Date().toISOString().split("T")[0],
       });
 
+      // Decrease item quantity
+      const newQuantity = item.quantity - quantity;
+      await storage.updateItem(item.id, {
+        itemName: item.itemName,
+        quantity: newQuantity,
+      });
+
       Alert.alert(
         "Success",
-        `Loaded ${quantity} units of ${item.itemName} to ${company.godownName}`,
+        `Loaded ${quantity} units of ${item.itemName}. Item quantity reduced to ${newQuantity}.`,
       );
       setShowQuantityModal(false);
+      onDelete(); // Refresh item list
     } catch (error) {
       Alert.alert("Error", "Failed to load item");
       console.error(error);

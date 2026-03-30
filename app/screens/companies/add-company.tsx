@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { Godown, storage } from "@/lib/storage";
+import { Company, Godown, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -25,6 +25,7 @@ export default function AddCompanyScreen() {
   const [allCompanyNames, setAllCompanyNames] = useState<string[]>([]);
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+  const [originalCompany, setOriginalCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     companyName: "",
     agentName: "",
@@ -66,6 +67,7 @@ export default function AddCompanyScreen() {
       const companies = await storage.getCompanies();
       const company = companies.find((c) => c.id === id);
       if (company) {
+        setOriginalCompany(company);
         setFormData({
           companyName: company.companyName,
           agentName: company.agentName || "",
@@ -151,6 +153,10 @@ export default function AddCompanyScreen() {
     setLoading(true);
     try {
       if (isEditing && companyId && typeof companyId === "string") {
+        // Check if godown changed
+        const godownChanged =
+          originalCompany && originalCompany.godownName !== formData.godownName;
+
         // Update existing company
         await storage.updateCompany(companyId, {
           companyName: formData.companyName.trim(),
@@ -158,6 +164,37 @@ export default function AddCompanyScreen() {
           godownName: formData.godownName.trim(),
           date: formData.date.toISOString().split("T")[0],
         });
+
+        // If godown changed, update all GodownStock entries
+        if (godownChanged && originalCompany) {
+          // Get all items for this company
+          const allItems = await storage.getItems();
+          const companyItems = allItems.filter(
+            (item) => item.companyId === companyId,
+          );
+
+          // For each item, move GodownStock from old godown to new godown
+          for (const item of companyItems) {
+            const godownStocks = await storage.getGodownStocks(item.id);
+            const oldGodownStocks = godownStocks.filter(
+              (s) => s.godownName === originalCompany.godownName,
+            );
+
+            for (const stock of oldGodownStocks) {
+              // Delete old godown stock entry
+              await storage.deleteGodownStock(stock.id);
+              // Create new godown stock entry with same quantity
+              await storage.addGodownStock({
+                itemId: item.id,
+                godownName: formData.godownName,
+                loadedQuantity: stock.loadedQuantity,
+                vehicleNumber: stock.vehicleNumber,
+                date: stock.date,
+              });
+            }
+          }
+        }
+
         await loadCompanyNames();
         Alert.alert("Success", "Company updated successfully", [
           {

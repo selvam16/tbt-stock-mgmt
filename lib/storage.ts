@@ -423,4 +423,25 @@ export const storage = {
       throw error;
     }
   },
+
+  async removeGodownStock(stock: Omit<GodownStock, "id" | "createdAt">): Promise<GodownStock> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      // Store unload as negative quantity
+      const newStock: GodownStock = {
+        ...stock,
+        loadedQuantity: -stock.loadedQuantity, // Negative for unload
+        id: createId(),
+        createdAt: Date.now(),
+      };
+      db.godownStocks = db.godownStocks || [];
+      db.godownStocks.push(newStock);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return newStock;
+    } catch (error) {
+      console.error("Error removing godown stock:", error);
+      throw error;
+    }
+  },
 };

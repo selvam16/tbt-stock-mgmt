@@ -68,7 +68,7 @@ export default function CompanyItemsScreen() {
     }
     router.push({
       pathname: "/screens/products/add-item",
-      params: { companyId, companyName },
+      params: { companyId, companyName, source },
     });
   };
 
@@ -76,7 +76,7 @@ export default function CompanyItemsScreen() {
     if (!companyId || typeof companyId !== "string") return;
     router.push({
       pathname: "/screens/products/add-item",
-      params: { companyId, companyName, itemId },
+      params: { companyId, companyName, itemId, source },
     });
   };
 
