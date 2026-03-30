@@ -35,7 +35,6 @@ export default function CompanyItemsScreen() {
       ? params.source
       : params.source?.[0] || "add"
   ) as "add" | "unload";
-  console.log("CompanyItemsScreen params:", { companyId, companyName, vehicleId, source, params });
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 

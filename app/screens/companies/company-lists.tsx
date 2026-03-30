@@ -24,7 +24,6 @@ export default function CompaniesScreen() {
     typeof params.vehicleId === "string"
       ? params.vehicleId
       : params.vehicleId?.[0];
-  console.log("CompaniesScreen params:", { partyId, vehicleId, params });
   const source = (
     typeof params.source === "string"
       ? params.source

@@ -1,4 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from 'expo-sharing';
+import { v4 as uuidv4 } from 'uuid';
+
+export const createId = () => uuidv4();
 
 export interface Party {
   id: string;
@@ -56,7 +60,6 @@ export interface GodownStock {
 }
 
 const DB_FILE = FileSystem.documentDirectory + "stock.json";
-
 export const storage = {
   async ensureInitialized() {
     try {
@@ -64,7 +67,7 @@ export const storage = {
       if (!exists.exists) {
         const godowns = [];
         for (let i = 1; i <= 10; i++) {
-          godowns.push({ id: `godown-${i}`, name: `KA-${i.toString().padStart(2, '0')}` });
+          godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
         }
         await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
       } else {
@@ -74,14 +77,14 @@ export const storage = {
         if (Array.isArray(parsed)) {
           const godowns = [];
           for (let i = 1; i <= 10; i++) {
-            godowns.push({ id: `godown-${i}`, name: `KA-${i.toString().padStart(2, '0')}` });
+            godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
           }
           await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
         } else if (!parsed.godowns) {
           // Add godowns if missing
           const godowns = [];
           for (let i = 1; i <= 10; i++) {
-            godowns.push({ id: `godown-${i}`, name: `KA-${i.toString().padStart(2, '0')}` });
+            godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
           }
           parsed.godowns = godowns;
           parsed.items = parsed.items || [];
@@ -93,6 +96,16 @@ export const storage = {
     } catch (error) {
       console.error("Error initializing storage:", error);
     }
+  },
+
+  async downloadJSON() {
+    const fileUri = FileSystem.documentDirectory + 'backup.json';
+
+    const data = await FileSystem.readAsStringAsync(DB_FILE);
+
+    await FileSystem.writeAsStringAsync(fileUri, data);
+
+    await Sharing.shareAsync(fileUri);
   },
 
   async getParties(): Promise<Party[]> {
@@ -113,11 +126,10 @@ export const storage = {
       const db = JSON.parse(data);
       const newParty: Party = {
         ...party,
-        id: Date.now().toString(),
+        id: createId(),
         createdAt: Date.now(),
       };
       db.parties.push(newParty);
-
       await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
       return newParty;
     } catch (error) {
@@ -188,7 +200,7 @@ export const storage = {
       const db = JSON.parse(data);
       const newCompany: Company = {
         ...company,
-        id: Date.now().toString(),
+        id: createId(),
         createdAt: Date.now(),
       };
       db.companies.push(newCompany);
@@ -249,7 +261,7 @@ export const storage = {
       const db = JSON.parse(data);
       const newItem: Item = {
         ...item,
-        id: Date.now().toString(),
+        id: createId(),
         createdAt: Date.now(),
       };
       db.items = db.items || [];
@@ -311,7 +323,7 @@ export const storage = {
       const db = JSON.parse(data);
       const newVehicle: Vehicle = {
         ...vehicle,
-        id: Date.now().toString(),
+        id: createId(),
         createdAt: Date.now(),
       };
       db.vehicles = db.vehicles || [];
@@ -371,7 +383,7 @@ export const storage = {
       const db = JSON.parse(data);
       const newStock: GodownStock = {
         ...stock,
-        id: Date.now().toString(),
+        id: createId(),
         createdAt: Date.now(),
       };
       db.godownStocks = db.godownStocks || [];

@@ -56,6 +56,12 @@ export default function Home() {
     >
       {/* STOCK */}
       <Text style={styles.sectionTitle}>Godowns</Text>
+      <TouchableOpacity
+        onPress={() => storage.downloadJSON()}
+        style={{ marginBottom: 12 }}
+      >
+        <Text style={{ color: colors.primary }}>Download Data</Text>
+      </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loading}>

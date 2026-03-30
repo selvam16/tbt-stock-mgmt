@@ -20,7 +20,6 @@ export default function ItemCard({
   source = "add",
   vehicleId,
 }: ItemCardProps) {
-  console.log("Rendering ItemCard for", vehicleId, item.itemName);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
