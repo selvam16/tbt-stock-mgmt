@@ -1,50 +1,238 @@
-# Welcome to your Expo app 👋
+# TBT Stock Management App 📱
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A comprehensive React Native stock management application built with Expo, designed for managing parties, companies, and inventory items with full CRUD operations.
 
-## Get started
+## 🚀 Features
 
-1. Install dependencies
+### Core Functionality
+
+- **Party Management**: Add, edit, and delete parties with contact information
+- **Company Management**: Create companies linked to parties with godown assignments
+- **Item Management**: Add items to companies with quantity tracking
+- **Godown Management**: Pre-configured godown locations (KA-01 to KA-10)
+- **Stock Dashboard**: View godown information and stock summaries
+
+### User Experience
+
+- **Intuitive Navigation**: Clean, hierarchical navigation flow
+- **Auto-complete**: Company name suggestions from existing data
+- **Form Validation**: Comprehensive input validation with user-friendly error messages
+- **Real-time Updates**: Automatic data refresh after operations
+- **Responsive Design**: Optimized for mobile devices
+
+### Data Management
+
+- **Persistent Storage**: File-based storage using Expo FileSystem
+- **Data Relationships**: Proper linking between parties → companies → items
+- **Quantity Aggregation**: Automatic calculation of total quantities per company
+- **Source Tracking**: Track whether operations are for "add" or "unload" stock
+
+## 🛠️ Tech Stack
+
+- **Framework**: React Native with Expo
+- **Language**: TypeScript
+- **Navigation**: Expo Router (file-based routing)
+- **Storage**: Expo FileSystem (JSON-based persistence)
+- **UI Components**: React Native built-in components
+- **Icons**: @expo/vector-icons (MaterialIcons)
+- **Date Picker**: @react-native-community/datetimepicker
+- **Linting**: ESLint with Expo configuration
+
+## 📦 Installation
+
+1. **Prerequisites**
+   - Node.js (v18 or higher)
+   - npm or yarn
+   - Expo CLI (`npm install -g @expo/cli`)
+
+2. **Clone and Install**
 
    ```bash
+   git clone <repository-url>
+   cd tbt-stock-mgmt
    npm install
    ```
 
-2. Start the app
+3. **Start Development Server**
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. **Run on Device/Emulator**
+   - For Android: `npx expo run:android`
+   - For iOS: `npx expo run:ios`
+   - For Web: `npx expo start --web`
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📱 Usage Guide
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Navigation Flow
 
-## Get a fresh project
+1. **Dashboard** (`/`): View godowns and access main functions
+2. **Load Stock** (`/screens/load`): Select party → Add/Edit companies → Manage items
+3. **Unload Stock** (`/screens/unload`): Select party → View companies → Manage items
 
-When you're ready, run:
+### Key Operations
 
-```bash
-npm run reset-project
+#### Managing Parties
+
+- Tap the **+** button to add a new party
+- Fill in party details (name, contact, address, city)
+- Edit or delete parties from the list
+
+#### Managing Companies
+
+- Select a party to view associated companies
+- Add companies with name, agent, godown selection, and date
+- Company names auto-complete from existing entries
+- View total quantity of items per company
+
+#### Managing Items
+
+- Select a company to view/manage items
+- Add items with name and quantity
+- Edit or delete individual items
+- Quantities are aggregated and displayed at company level
+
+## 🗂️ Project Structure
+
+```
+tbt-stock-mgmt/
+├── app/                          # Main application screens
+│   ├── index.tsx                 # Dashboard/Home screen
+│   ├── _layout.tsx               # Root layout
+│   ├── screens/                  # Feature screens
+│   │   ├── load.tsx              # Load stock flow
+│   │   ├── unload.tsx            # Unload stock flow
+│   │   ├── add-party.tsx         # Party creation/editing
+│   │   ├── companies.tsx         # Company list for a party
+│   │   ├── add-company.tsx       # Company creation/editing
+│   │   ├── company-items.tsx     # Item list for a company
+│   │   └── add-item.tsx          # Item creation/editing
+│   └── ...
+├── components/                   # Reusable UI components
+│   ├── AppLayout.tsx             # Main app layout wrapper
+│   ├── AddPartyFAB.tsx           # Floating action button
+│   ├── PartyCard.tsx             # Party list item
+│   ├── CompanyCard.tsx           # Company list item
+│   ├── ItemCard.tsx              # Item list item
+│   └── MultiFAB.tsx              # Multi-action FAB
+├── lib/                          # Business logic and utilities
+│   └── storage.ts                # Data persistence layer
+├── theme/                        # Styling and theming
+│   └── color.ts                  # Color definitions
+├── assets/                       # Static assets
+│   └── images/                   # Image files
+└── android/                      # Android-specific files
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 💾 Database Schema
 
-## Learn more
+The app uses a JSON-based storage system with the following structure:
 
-To learn more about developing your project with Expo, look at the following resources:
+### Party
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```typescript
+{
+  id: string;
+  title: string; // "MR" | "M/S"
+  name: string;
+  contact: string;
+  city: string;
+  address: string;
+  createdAt: number;
+}
+```
 
-## Join the community
+### Company
 
-Join our community of developers creating universal apps.
+```typescript
+{
+  id: string;
+  partyId: string;        // Links to Party
+  companyName: string;
+  agentName?: string;
+  godownName: string;     // "KA-01" to "KA-10"
+  date: string;           // ISO date string
+  source: "add" | "unload";
+  createdAt: number;
+}
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Item
+
+```typescript
+{
+  id: string;
+  companyId: string; // Links to Company
+  itemName: string;
+  quantity: number;
+  createdAt: number;
+}
+```
+
+### Godown
+
+```typescript
+{
+  id: string;
+  name: string; // "KA-01" to "KA-10"
+}
+```
+
+## 🔧 Development
+
+### Available Scripts
+
+- `npm start` - Start the Expo development server
+- `npm run android` - Run on Android emulator/device
+- `npm run ios` - Run on iOS simulator
+- `npm run web` - Run in web browser
+- `npm run lint` - Run ESLint for code quality
+
+### Code Quality
+
+- TypeScript for type safety
+- ESLint for code linting
+- Prettier for code formatting (via ESLint)
+- Expo's recommended project structure
+
+### Key Development Patterns
+
+- **File-based Routing**: Expo Router for navigation
+- **Component Composition**: Reusable UI components
+- **State Management**: React hooks with local state
+- **Data Persistence**: Custom storage abstraction layer
+- **Error Handling**: Try-catch blocks with user-friendly alerts
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow TypeScript best practices
+- Use meaningful component and variable names
+- Add proper error handling
+- Test on both Android and iOS
+- Follow the existing code style and patterns
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙋 Support
+
+For questions or issues:
+
+- Create an issue on GitHub
+- Check the [Expo documentation](https://docs.expo.dev/)
+- Join the [Expo Discord community](https://chat.expo.dev/)
+
+---
+
+Built with ❤️ using React Native and Expo

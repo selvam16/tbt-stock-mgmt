@@ -9,6 +9,9 @@ interface CompanyCardProps {
   totalQuantity?: number;
   onDelete: () => void;
   onEdit: () => void;
+  source?: "add" | "unload";
+  showActions?: boolean;
+  vehicleId?: string;
 }
 
 export default function CompanyCard({
@@ -16,6 +19,9 @@ export default function CompanyCard({
   totalQuantity = 0,
   onDelete,
   onEdit,
+  source = "add",
+  showActions = true,
+  vehicleId,
 }: CompanyCardProps) {
   const router = useRouter();
 
@@ -25,6 +31,8 @@ export default function CompanyCard({
       params: {
         companyId: company.id,
         companyName: company.companyName,
+        vehicleId: vehicleId,
+        source,
       },
     });
   };
@@ -54,7 +62,11 @@ export default function CompanyCard({
   };
 
   return (
-    <TouchableOpacity style={styles.companyItem} onPress={handleCardPress}>
+    <TouchableOpacity
+      style={styles.companyItem}
+      onPress={handleCardPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.companyInfo}>
         <Text style={styles.companyName}>{company.companyName}</Text>
         {company.agentName ? (
@@ -67,14 +79,16 @@ export default function CompanyCard({
           Total Quantity: {totalQuantity}
         </Text>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-          <MaterialIcons name="edit" size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <MaterialIcons name="delete" size={20} color="#ef4444" />
-        </TouchableOpacity>
-      </View>
+      {showActions && (
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+            <MaterialIcons name="edit" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <MaterialIcons name="delete" size={20} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }

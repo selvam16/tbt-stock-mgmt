@@ -34,6 +34,27 @@ export interface Item {
   createdAt: number;
 }
 
+export interface Vehicle {
+  id: string;
+  partyId: string;
+  vehicleNumber: string;
+  nameBoard: string;
+  vehicleType: string;
+  deliveryAt: string;
+  date: string;
+  createdAt: number;
+}
+
+export interface GodownStock {
+  id: string;
+  itemId: string;
+  godownName: string;
+  loadedQuantity: number;
+  vehicleNumber: string;
+  date: string;
+  createdAt: number;
+}
+
 const DB_FILE = FileSystem.documentDirectory + "stock.json";
 
 export const storage = {
@@ -45,7 +66,7 @@ export const storage = {
         for (let i = 1; i <= 10; i++) {
           godowns.push({ id: `godown-${i}`, name: `KA-${i.toString().padStart(2, '0')}` });
         }
-        await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [] }));
+        await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
       } else {
         // Check if it's the old format (array), migrate
         const data = await FileSystem.readAsStringAsync(DB_FILE);
@@ -55,7 +76,7 @@ export const storage = {
           for (let i = 1; i <= 10; i++) {
             godowns.push({ id: `godown-${i}`, name: `KA-${i.toString().padStart(2, '0')}` });
           }
-          await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns }));
+          await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
         } else if (!parsed.godowns) {
           // Add godowns if missing
           const godowns = [];
@@ -64,6 +85,8 @@ export const storage = {
           }
           parsed.godowns = godowns;
           parsed.items = parsed.items || [];
+          parsed.vehicles = parsed.vehicles || [];
+          parsed.godownStocks = parsed.godownStocks || [];
           await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(parsed));
         }
       }
@@ -266,6 +289,70 @@ export const storage = {
     }
   },
 
+  async getVehicles(partyId?: string): Promise<Vehicle[]> {
+    try {
+      await this.ensureInitialized();
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const vehicles = db.vehicles || [];
+      if (partyId) {
+        return vehicles.filter((v: Vehicle) => v.partyId === partyId);
+      }
+      return vehicles;
+    } catch (error) {
+      console.error("Error reading vehicles:", error);
+      return [];
+    }
+  },
+
+  async addVehicle(vehicle: Omit<Vehicle, "id" | "createdAt">): Promise<Vehicle> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const newVehicle: Vehicle = {
+        ...vehicle,
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+      };
+      db.vehicles = db.vehicles || [];
+      db.vehicles.push(newVehicle);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return newVehicle;
+    } catch (error) {
+      console.error("Error adding vehicle:", error);
+      throw error;
+    }
+  },
+
+  async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const vehicles = db.vehicles || [];
+      const index = vehicles.findIndex((v: Vehicle) => v.id === id);
+      if (index === -1) throw new Error("Vehicle not found");
+      vehicles[index] = { ...vehicles[index], ...updates };
+      db.vehicles = vehicles;
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return vehicles[index];
+    } catch (error) {
+      console.error("Error updating vehicle:", error);
+      throw error;
+    }
+  },
+
+  async deleteVehicle(id: string): Promise<void> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      db.vehicles = (db.vehicles || []).filter((v: Vehicle) => v.id !== id);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      throw error;
+    }
+  },
+
   async getGodowns(): Promise<Godown[]> {
     try {
       await this.ensureInitialized();
@@ -275,6 +362,53 @@ export const storage = {
     } catch (error) {
       console.error("Error reading godowns:", error);
       return [];
+    }
+  },
+
+  async addGodownStock(stock: Omit<GodownStock, "id" | "createdAt">): Promise<GodownStock> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const newStock: GodownStock = {
+        ...stock,
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+      };
+      db.godownStocks = db.godownStocks || [];
+      db.godownStocks.push(newStock);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return newStock;
+    } catch (error) {
+      console.error("Error adding godown stock:", error);
+      throw error;
+    }
+  },
+
+  async getGodownStocks(itemId?: string): Promise<GodownStock[]> {
+    try {
+      await this.ensureInitialized();
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const stocks = db.godownStocks || [];
+      if (itemId) {
+        return stocks.filter((s: GodownStock) => s.itemId === itemId);
+      }
+      return stocks;
+    } catch (error) {
+      console.error("Error reading godown stocks:", error);
+      return [];
+    }
+  },
+
+  async deleteGodownStock(id: string): Promise<void> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      db.godownStocks = (db.godownStocks || []).filter((s: GodownStock) => s.id !== id);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+    } catch (error) {
+      console.error("Error deleting godown stock:", error);
+      throw error;
     }
   },
 };
