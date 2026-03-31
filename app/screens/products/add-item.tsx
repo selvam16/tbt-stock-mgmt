@@ -31,12 +31,16 @@ export default function AddItemScreen() {
   const [loading, setLoading] = useState(itemId ? true : false);
   const [company, setCompany] = useState<Company | null>(null);
   const [isEditing] = useState(!!itemId);
+  const [allItemNames, setAllItemNames] = useState<string[]>([]);
+  const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
+  const [showItemSuggestions, setShowItemSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     itemName: "",
     quantity: "",
   });
 
   useEffect(() => {
+    loadItemNames();
     if (companyId && typeof companyId === "string") {
       loadCompany(companyId);
     }
@@ -44,6 +48,18 @@ export default function AddItemScreen() {
       loadItem(itemId);
     }
   }, [companyId, itemId]);
+
+  const loadItemNames = async () => {
+    try {
+      const items = await storage.getItems();
+      const uniqueNames = Array.from(
+        new Set(items.map((i) => i.itemName.trim()).filter(Boolean)),
+      );
+      setAllItemNames(uniqueNames);
+    } catch (error) {
+      console.error("Error loading item names:", error);
+    }
+  };
 
   const loadCompany = async (id: string) => {
     try {
@@ -73,7 +89,26 @@ export default function AddItemScreen() {
   };
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === "itemName") {
+      const updated = value.trimStart();
+      const matches = allItemNames.filter(
+        (name) =>
+          name.toLowerCase().includes(updated.toLowerCase()) &&
+          name.toLowerCase() !== updated.toLowerCase(),
+      );
+      setItemSuggestions(matches);
+      setShowItemSuggestions(matches.length > 0 && updated.length > 0);
+      setFormData((prev) => ({ ...prev, itemName: updated }));
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSelectItemSuggestion = (itemName: string) => {
+    setFormData((prev) => ({ ...prev, itemName }));
+    setItemSuggestions([]);
+    setShowItemSuggestions(false);
   };
 
   const validateForm = (): boolean => {
@@ -145,7 +180,7 @@ export default function AddItemScreen() {
               godownName: company.godownName,
               loadedQuantity: quantityDifference,
               vehicleNumber: "Received",
-              date: new Date().toISOString().split("T")[0],
+              date: company.date,
             });
           }
         }
@@ -168,7 +203,7 @@ export default function AddItemScreen() {
             godownName: company.godownName,
             loadedQuantity: quantity, // Positive: stock entering godown
             vehicleNumber: "Received",
-            date: new Date().toISOString().split("T")[0],
+            date: company.date,
           });
         }
 
@@ -211,7 +246,23 @@ export default function AddItemScreen() {
             onChangeText={(value) => handleInputChange("itemName", value)}
             editable={!loading}
             autoFocus={!isEditing}
+            onFocus={() => {
+              if (itemSuggestions.length > 0) setShowItemSuggestions(true);
+            }}
           />
+          {showItemSuggestions && itemSuggestions.length > 0 && (
+            <View style={styles.autocompleteContainer}>
+              {itemSuggestions.map((name) => (
+                <TouchableOpacity
+                  key={name}
+                  style={styles.autocompleteOption}
+                  onPress={() => handleSelectItemSuggestion(name)}
+                >
+                  <Text style={styles.autocompleteOptionText}>{name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -307,4 +358,24 @@ const styles = StyleSheet.create({
   },
   saveButton: { backgroundColor: colors.primary },
   saveButtonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  autocompleteContainer: {
+    position: "relative",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    maxHeight: 150,
+    marginTop: 4,
+    zIndex: 999,
+  },
+  autocompleteOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  autocompleteOptionText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
 });

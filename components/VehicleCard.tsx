@@ -1,6 +1,8 @@
+import { formatters } from "@/lib/formatters";
 import { Company, GodownStock, Item, Vehicle, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Print from "expo-print";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -29,13 +31,13 @@ export default function VehicleCard({
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [loadedItems, setLoadedItems] = useState<
-    Array<{
+    {
       godownStock: GodownStock;
       company: Company | null;
       item: Item | null;
       totalQuantity: number;
       godowns: string[];
-    }>
+    }[]
   >([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -94,7 +96,7 @@ export default function VehicleCard({
       const companies = await storage.getCompanies();
       const items = await storage.getItems();
 
-      // Build detailed list with grouping by company and item
+      // Build detailed list with grouping by company AND item, summing quantities
       const groupedMap = new Map<
         string,
         {
@@ -102,7 +104,6 @@ export default function VehicleCard({
           company: Company | null;
           item: Item | null;
           totalQuantity: number;
-          godowns: string[];
         }
       >();
 
@@ -112,27 +113,34 @@ export default function VehicleCard({
           ? companies.find((c) => c.id === item.companyId) || null
           : null;
 
-        // Create a unique key for grouping: company_id + item_id
+        // Group by company ID + item ID to consolidate same item from same company
         const groupKey = `${item?.companyId || "unknown"}_${stock.itemId}`;
 
         if (groupedMap.has(groupKey)) {
           const existing = groupedMap.get(groupKey)!;
+          // Add quantity if same company and same item
           existing.totalQuantity += Math.abs(stock.loadedQuantity);
-          if (!existing.godowns.includes(stock.godownName)) {
-            existing.godowns.push(stock.godownName);
-          }
         } else {
           groupedMap.set(groupKey, {
             godownStock: stock,
             company,
             item,
             totalQuantity: Math.abs(stock.loadedQuantity),
-            godowns: [stock.godownName],
           });
         }
       });
 
-      const details = Array.from(groupedMap.values());
+      // Convert to array and add flag for showing company name
+      const details = Array.from(groupedMap.values()).map(
+        (item, index, array) => {
+          const isFirstOfCompany =
+            index === 0 || array[index - 1].company?.id !== item.company?.id;
+          return {
+            ...item,
+            showCompanyName: isFirstOfCompany,
+          };
+        },
+      );
       setLoadedItems(details as any);
       setShowModal(true);
     } catch (error) {
@@ -140,6 +148,245 @@ export default function VehicleCard({
       console.error(error);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      // Fetch party details
+      const parties = await storage.getParties();
+      const party = parties.find((p) => p.id === vehicle.partyId);
+
+      // Create HTML content for PDF
+      let htmlContent = `
+        <html>
+          <head>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body {
+                font-family: Arial, sans-serif;
+                margin: 15px;
+                background-color: #f5f5f5;
+              }
+              .logo-section {
+                display: flex;
+                justify-content: center;
+                margin-bottom: 20px;
+              }
+              .logo {
+                width: 80px;
+                height: 80px;
+                border-radius: 50%;
+                background-color: #007AFF;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 32px;
+              }
+              .details-section {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+              }
+              .party-details {
+                flex: 1;
+                background-color: white;
+                padding: 12px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              }
+              .vehicle-details {
+                flex: 1;
+                background-color: white;
+                padding: 12px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              }
+              .detail-item {
+                display: flex;
+                margin-bottom: 6px;
+                font-size: 13px;
+              }
+              .detail-label {
+                font-weight: bold;
+                color: #555;
+                font-size: 12px;
+                margin-right: 8px;
+                flex: 0 0 120px;
+              }
+              .detail-value {
+                color: #333;
+                font-size: 13px;
+              }
+              .section-title {
+                font-weight: bold;
+                color: #007AFF;
+                font-size: 14px;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 4px;
+              }
+              .items-section {
+                margin-top: 15px;
+              }
+              .items-header {
+                background-color: #007AFF;
+                color: white;
+                padding: 8px;
+                border-radius: 5px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                font-size: 13px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                background-color: white;
+                font-size: 12px;
+              }
+              th {
+                background-color: #f0f0f0;
+                padding: 8px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 2px solid #ddd;
+                font-size: 11px;
+              }
+              td {
+                padding: 8px;
+                border-bottom: 1px solid #ddd;
+              }
+              tr:nth-child(even) {
+                background-color: #f9f9f9;
+              }
+              .footer {
+                margin-top: 15px;
+                text-align: center;
+                color: #666;
+                font-size: 10px;
+              }
+              .empty-message {
+                background-color: white;
+                padding: 15px;
+                text-align: center;
+                color: #999;
+                border-radius: 5px;
+                font-size: 12px;
+              }
+            </style>
+          </head>
+          <body>
+            <!-- Logo Section - Centered -->
+            <div class="logo-section">
+              <div class="logo">📋</div>
+            </div>
+            
+            <!-- Details Section: Party Details and Vehicle Details Side by Side -->
+            <div class="details-section">
+              <div class="party-details">
+                ${
+                  party
+                    ? `
+                  <div class="detail-value">${party.title || "N/A"} - ${party.name || "N/A"}</div>
+                  <div class="detail-value">${party.contact || "N/A"}</div>
+                  <div class="detail-value">${party.city || "N/A"}</div>
+                  <div class="detail-value">${party.address || "N/A"}</div>
+                `
+                    : `
+                  <div class="detail-value">No party details available</div>
+                `
+                }
+              </div>
+              
+              <div class="vehicle-details">
+                <div class="detail-item">
+                  <span class="detail-label">Date:</span>
+                  <span class="detail-value">${formatters.date(vehicle.date)}</span>
+                </div>
+                
+                <div class="detail-item">
+                  <span class="detail-label">Vehicle Number:</span>
+                  <span class="detail-value">${vehicle.vehicleNumber}</span>
+                </div>
+                
+                <div class="detail-item">
+                  <span class="detail-label">Name Board:</span>
+                  <span class="detail-value">${vehicle.nameBoard}</span>
+                </div>
+                
+                <div class="detail-item">
+                  <span class="detail-label">Type:</span>
+                  <span class="detail-value">${vehicle.vehicleType}</span>
+                </div>
+                
+                <div class="detail-item">
+                  <span class="detail-label">Delivery At:</span>
+                  <span class="detail-value">${vehicle.deliveryAt}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Items Section -->
+            <div class="items-section">
+              <div class="items-header">LOADED ITEMS</div>
+              ${
+                loadedItems.length === 0
+                  ? `<div class="empty-message">No items loaded</div>`
+                  : `
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Company</th>
+                      <th>Item</th>
+                      <th>Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${loadedItems
+                      .map(
+                        (item, index) => `
+                      <tr>
+                        <td>${index + 1}</td>
+                        <td>${(item as any).showCompanyName ? item.company?.companyName || "Unknown" : ""}</td>
+                        <td>${item.item?.itemName || "Unknown"}</td>
+                        <td>${item.totalQuantity}</td>
+                      </tr>
+                    `,
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              `
+              }
+            </div>
+
+            <!-- Total and Footer -->
+            <div style="background-color: white; padding: 12px; margin-top: 15px; border-radius: 5px; border: 1px solid #ddd;">
+              <div style="font-weight: bold; color: #333;">Total Items: ${loadedItems.length}</div>
+            </div>
+
+            <div class="footer">
+              <p>Generated on ${new Date().toLocaleString()}</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Generate PDF from HTML using expo-print
+      await Print.printAsync({
+        html: htmlContent,
+      });
+
+      setShowModal(false);
+    } catch (error) {
+      console.error("Print error:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to generate PDF",
+      );
     }
   };
 
@@ -151,13 +398,22 @@ export default function VehicleCard({
         activeOpacity={0.7}
       >
         <View style={styles.vehicleInfo}>
-          <Text style={styles.vehicleNumber}>🚚 {vehicle.vehicleNumber}</Text>
-          <Text style={styles.vehicleDetail}>📋 {vehicle.nameBoard}</Text>
-          <Text style={styles.vehicleDetail}>
-            📦 Type: {vehicle.vehicleType}
+          <Text style={styles.vehicleNumber}>
+            🚚 {formatters.vehicleNumber(vehicle.vehicleNumber)}
           </Text>
-          <Text style={styles.vehicleDetail}>📍 {vehicle.deliveryAt}</Text>
-          <Text style={styles.vehicleDetail}>📅 {vehicle.date}</Text>
+          <Text style={styles.vehicleDetail}>
+            📋 {formatters.vehicleNameBoard(vehicle.nameBoard)}
+          </Text>
+          <Text style={styles.vehicleDetail}>
+            📦 {formatters.label("TYPE")}:{" "}
+            {formatters.vehicleType(vehicle.vehicleType)}
+          </Text>
+          <Text style={styles.vehicleDetail}>
+            📍 {formatters.deliveryLocation(vehicle.deliveryAt)}
+          </Text>
+          <Text style={styles.vehicleDetail}>
+            📅 {formatters.date(vehicle.date)}
+          </Text>
           {loadedQuantity > 0 && (
             <View style={styles.quantityBadge}>
               <Text style={styles.quantityText}>
@@ -207,14 +463,11 @@ export default function VehicleCard({
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                Loaded Items - {vehicle.vehicleNumber}
+                {formatters.label("LOADED ITEMS")} -{" "}
+                {formatters.vehicleNumber(vehicle.vehicleNumber)}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialIcons
-                  name="close"
-                  size={24}
-                  color={colors.textPrimary}
-                />
+              <TouchableOpacity onPress={handlePrint}>
+                <MaterialIcons name="print" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
@@ -232,7 +485,7 @@ export default function VehicleCard({
                       styles.companyColumn,
                     ]}
                   >
-                    Company
+                    {formatters.label("COMPANY")}
                   </Text>
                   <Text
                     style={[
@@ -241,16 +494,7 @@ export default function VehicleCard({
                       styles.itemColumn,
                     ]}
                   >
-                    Item
-                  </Text>
-                  <Text
-                    style={[
-                      styles.tableCell,
-                      styles.tableHeaderCell,
-                      styles.godownColumn,
-                    ]}
-                  >
-                    Godown
+                    {formatters.label("ITEM")}
                   </Text>
                   <Text
                     style={[
@@ -259,16 +503,7 @@ export default function VehicleCard({
                       styles.quantityColumn,
                     ]}
                   >
-                    Qty
-                  </Text>
-                  <Text
-                    style={[
-                      styles.tableCell,
-                      styles.tableHeaderCell,
-                      styles.dateColumn,
-                    ]}
-                  >
-                    Date
+                    {formatters.label("QTY")}
                   </Text>
                 </View>
 
@@ -285,13 +520,14 @@ export default function VehicleCard({
                       ]}
                     >
                       <Text style={[styles.tableCell, styles.companyColumn]}>
-                        {item.company?.companyName || "Unknown"}
+                        {(item as any).showCompanyName
+                          ? formatters.companyName(
+                              item.company?.companyName || "Unknown",
+                            )
+                          : ""}
                       </Text>
                       <Text style={[styles.tableCell, styles.itemColumn]}>
-                        {item.item?.itemName || "Unknown"}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.godownColumn]}>
-                        {item.godowns.join(", ")}
+                        {formatters.itemName(item.item?.itemName || "Unknown")}
                       </Text>
                       <Text
                         style={[
@@ -301,9 +537,6 @@ export default function VehicleCard({
                         ]}
                       >
                         {item.totalQuantity}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.dateColumn]}>
-                        {item.godownStock.date}
                       </Text>
                     </View>
                   )}

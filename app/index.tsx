@@ -1,3 +1,4 @@
+import { formatters } from "@/lib/formatters";
 import { Godown, GodownStock, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -100,6 +101,9 @@ export default function Home() {
         <FlatList
           data={godowns}
           keyExtractor={(item) => item.id}
+          numColumns={3}
+          columnWrapperStyle={styles.columnWrapper}
+          scrollEnabled={true}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() =>
@@ -109,20 +113,13 @@ export default function Home() {
                 })
               }
               activeOpacity={0.7}
+              style={styles.cardWrapper}
             >
               <View style={styles.card}>
-                <View style={styles.cardContent}>
-                  <View style={styles.godownInfo}>
-                    <Text style={styles.godownId}>ID: {item.id}</Text>
-                    <Text style={styles.godownName}>{item.name}</Text>
-                  </View>
-                  <View style={styles.quantityContainer}>
-                    <Text style={styles.quantityLabel}>Total Qty</Text>
-                    <Text style={styles.quantityValue}>
-                      {item.totalQuantity}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={styles.godownLabel}>
+                  {formatters.godownName(item.name)}
+                </Text>
+                <Text style={styles.quantityValue}>{item.totalQuantity}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -141,46 +138,32 @@ const styles = StyleSheet.create({
   marginTop: {
     marginTop: 20,
   },
+  columnWrapper: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  cardWrapper: {
+    flex: 1,
+  },
   card: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    backgroundColor: colors.card,
+    borderRadius: 8,
     padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  godownLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
     marginBottom: 8,
-  },
-  cardContent: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  godownInfo: {
-    flex: 1,
-  },
-  godownId: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  godownName: {
-    fontSize: 16,
     fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  quantityContainer: {
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  quantityLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 4,
+    textAlign: "center",
   },
   quantityValue: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     color: colors.primary,
   },
   loading: {

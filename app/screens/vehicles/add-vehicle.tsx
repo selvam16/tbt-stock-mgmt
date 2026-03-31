@@ -1,10 +1,13 @@
 import AppLayout from "@/components/AppLayout";
+import { formatters } from "@/lib/formatters";
 import { storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -17,52 +20,63 @@ export default function AddVehicleScreen() {
   const { vehicleId, partyId } = useLocalSearchParams();
   const [loading, setLoading] = useState(vehicleId ? true : false);
   const [isEditing] = useState(!!vehicleId);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [formData, setFormData] = useState({
     vehicleNumber: "",
     nameBoard: "",
     vehicleType: "Commercial",
     deliveryAt: "",
-    date: new Date().toISOString().split("T")[0],
+    date: new Date(),
   });
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
   const vehicleTypes = ["Commercial", "Passenger", "Heavy", "Light", "Other"];
 
+  const loadVehicleData = useCallback(
+    async (id: string) => {
+      try {
+        const allPartyId = partyId || "";
+        const existingPartyId =
+          typeof allPartyId === "string" ? allPartyId : allPartyId[0];
+        const vehicles = await storage.getVehicles(existingPartyId);
+        const vehicle = vehicles.find((v) => v.id === id);
+        if (vehicle) {
+          setFormData({
+            vehicleNumber: vehicle.vehicleNumber,
+            nameBoard: vehicle.nameBoard,
+            vehicleType: vehicle.vehicleType,
+            deliveryAt: vehicle.deliveryAt,
+            date: new Date(vehicle.date),
+          });
+        }
+      } catch (error) {
+        Alert.alert("Error", "Failed to load vehicle data");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [partyId],
+  );
+
   useEffect(() => {
     if (vehicleId && typeof vehicleId === "string") {
       loadVehicleData(vehicleId);
     }
-  }, [vehicleId]);
+  }, [vehicleId, loadVehicleData]);
 
-  const loadVehicleData = async (id: string) => {
-    try {
-      const allPartyId = partyId || "";
-      const existingPartyId =
-        typeof allPartyId === "string" ? allPartyId : allPartyId[0];
-      const vehicles = await storage.getVehicles(existingPartyId);
-      const vehicle = vehicles.find((v) => v.id === id);
-      if (vehicle) {
-        setFormData({
-          vehicleNumber: vehicle.vehicleNumber,
-          nameBoard: vehicle.nameBoard,
-          vehicleType: vehicle.vehicleType,
-          deliveryAt: vehicle.deliveryAt,
-          date: vehicle.date,
-        });
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to load vehicle data");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | Date) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === "ios");
+    if (selectedDate) {
+      handleInputChange("date", selectedDate);
+    }
   };
 
   const handleClear = () => {
@@ -71,9 +85,10 @@ export default function AddVehicleScreen() {
       nameBoard: "",
       vehicleType: "Commercial",
       deliveryAt: "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date(),
     });
     setShowTypeDropdown(false);
+    setShowDatePicker(false);
   };
 
   const validateForm = (): boolean => {
@@ -89,7 +104,7 @@ export default function AddVehicleScreen() {
       Alert.alert("Validation Error", "Delivery location is required");
       return false;
     }
-    if (!formData.date.trim()) {
+    if (!formData.date) {
       Alert.alert("Validation Error", "Date is required");
       return false;
     }
@@ -117,7 +132,7 @@ export default function AddVehicleScreen() {
           nameBoard: formData.nameBoard.trim(),
           vehicleType: formData.vehicleType,
           deliveryAt: formData.deliveryAt.trim(),
-          date: formData.date.trim(),
+          date: formData.date.toISOString().split("T")[0],
         });
         Alert.alert("Success", "Vehicle updated successfully", [
           {
@@ -133,7 +148,7 @@ export default function AddVehicleScreen() {
           nameBoard: formData.nameBoard.trim(),
           vehicleType: formData.vehicleType,
           deliveryAt: formData.deliveryAt.trim(),
-          date: formData.date.trim(),
+          date: formData.date.toISOString().split("T")[0],
         });
         Alert.alert("Success", "Vehicle added successfully", [
           {
@@ -251,14 +266,23 @@ export default function AddVehicleScreen() {
           {/* Date Field */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Date *</Text>
-            <TextInput
+            <TouchableOpacity
               style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textSecondary}
-              value={formData.date}
-              onChangeText={(value) => handleInputChange("date", value)}
-              editable={!loading}
-            />
+              onPress={() => setShowDatePicker(true)}
+              disabled={loading}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                {formatters.dateFromObject(formData.date)}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={formData.date}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
           </View>
         </View>
 

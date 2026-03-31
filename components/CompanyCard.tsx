@@ -1,3 +1,4 @@
+import { formatters } from "@/lib/formatters";
 import { Company, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -12,6 +13,7 @@ interface CompanyCardProps {
   source?: "add" | "unload";
   showActions?: boolean;
   vehicleId?: string;
+  partyId?: string;
 }
 
 export default function CompanyCard({
@@ -22,6 +24,7 @@ export default function CompanyCard({
   source = "add",
   showActions = true,
   vehicleId,
+  partyId,
 }: CompanyCardProps) {
   const router = useRouter();
 
@@ -29,6 +32,7 @@ export default function CompanyCard({
     router.push({
       pathname: "/screens/products/company-items",
       params: {
+        partyId,
         companyId: company.id,
         companyName: company.companyName,
         vehicleId: vehicleId,
@@ -68,15 +72,28 @@ export default function CompanyCard({
       activeOpacity={0.7}
     >
       <View style={styles.companyInfo}>
-        <Text style={styles.companyName}>{company.companyName}</Text>
+        <Text style={styles.companyName}>
+          {formatters.companyName(company.companyName)}
+        </Text>
         {company.agentName ? (
-          <Text style={styles.companyDetail}>Agent: {company.agentName}</Text>
+          <Text style={styles.companyDetail}>
+            {formatters.label("AGENT")}:{" "}
+            {formatters.agentName(company.agentName)}
+          </Text>
         ) : null}
-        <Text style={styles.companyDetail}>Godown: {company.godownName}</Text>
-        <Text style={styles.companyDetail}>Date: {company.date}</Text>
-        <Text style={styles.companyDetail}>Source: {company.source}</Text>
         <Text style={styles.companyDetail}>
-          Total Quantity: {totalQuantity}
+          {formatters.label("GODOWN")}:{" "}
+          {formatters.godownName(company.godownName)}
+        </Text>
+        <Text style={styles.companyDetail}>
+          {formatters.label("DATE")}: {formatters.date(company.date)}
+        </Text>
+        <Text style={styles.companyDetail}>
+          {formatters.label("SOURCE")}:{" "}
+          {formatters.companySource(company.source)}
+        </Text>
+        <Text style={styles.companyDetail}>
+          {formatters.label("TOTAL QTY")}: {totalQuantity}
         </Text>
       </View>
       {showActions && (

@@ -1,3 +1,4 @@
+import { formatters } from "@/lib/formatters";
 import { Party, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -63,7 +64,8 @@ export default function PartyCard({
     <TouchableOpacity style={styles.partyCard} onPress={handleCardPress}>
       <View style={styles.partyInfo}>
         <Text style={styles.partyName}>
-          {party.title} {party.name}
+          {formatters.partyTitle(party.title)}{" "}
+          {formatters.partyName(party.name)}
         </Text>
         <Text style={styles.partyDetail}>📞 {party.contact}</Text>
       </View>

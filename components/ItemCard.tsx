@@ -1,3 +1,4 @@
+import { formatters } from "@/lib/formatters";
 import { Item, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -11,6 +12,7 @@ interface ItemCardProps {
   onDelete: () => void;
   source?: "add" | "unload";
   vehicleId?: string;
+  partyId?: string;
 }
 
 export default function ItemCard({
@@ -19,6 +21,7 @@ export default function ItemCard({
   onDelete,
   source = "add",
   vehicleId,
+  partyId,
 }: ItemCardProps) {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,7 +84,7 @@ export default function ItemCard({
       }
 
       // Get vehicle details for vehicle number
-      const allVehicles = await storage.getVehicles();
+      const allVehicles = await storage.getVehicles(partyId);
       const vehicle = allVehicles.find((v) => v.id === vehicleId);
 
       if (!vehicle) {
@@ -95,7 +98,7 @@ export default function ItemCard({
         godownName: company.godownName,
         loadedQuantity: -quantity, // Negative because item is leaving
         vehicleNumber: vehicle.vehicleNumber,
-        date: new Date().toISOString().split("T")[0],
+        date: vehicle.date, // Use vehicle date for stock entry
       });
 
       // Decrease item quantity
@@ -123,8 +126,10 @@ export default function ItemCard({
     <>
       <View style={styles.itemCard}>
         <View style={styles.info}>
-          <Text style={styles.name}>{item.itemName}</Text>
-          <Text style={styles.detail}>Qty: {item.quantity}</Text>
+          <Text style={styles.name}>{formatters.itemName(item.itemName)}</Text>
+          <Text style={styles.detail}>
+            {formatters.label("QTY")}: {item.quantity}
+          </Text>
         </View>
         <View style={styles.actions}>
           {source === "add" && (

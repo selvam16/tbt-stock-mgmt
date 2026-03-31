@@ -126,6 +126,7 @@ export default function CompaniesScreen() {
     router.push({
       pathname: "/screens/products/company-items",
       params: {
+        partyId,
         companyId: company.id,
         companyName: company.companyName,
         vehicleId,
@@ -151,6 +152,7 @@ export default function CompaniesScreen() {
         source={source as "add" | "unload"}
         showActions={source !== "add"}
         vehicleId={vehicleId}
+        partyId={partyId}
       />
     </TouchableOpacity>
   );

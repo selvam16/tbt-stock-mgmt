@@ -26,6 +26,8 @@ export default function CompanyItemsScreen() {
     typeof params.companyName === "string"
       ? params.companyName
       : params.companyName?.[0];
+  const partyId =
+    typeof params.partyId === "string" ? params.partyId : params.partyId?.[0];
   const vehicleId =
     typeof params.vehicleId === "string"
       ? params.vehicleId
@@ -114,6 +116,7 @@ export default function CompanyItemsScreen() {
                 onEdit={() => handleEditItem(item.id)}
                 onDelete={handleItemDeleted}
                 vehicleId={vehicleId as string}
+                partyId={partyId as string}
                 source={source as "add" | "unload"}
               />
             )}
