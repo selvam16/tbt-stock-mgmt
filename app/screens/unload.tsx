@@ -35,7 +35,7 @@ export default function UnloadScreen() {
 
   return (
     <View style={styles.container}>
-      <AppLayout title="Unload Stock">
+      <AppLayout title="Unload Stock" isHome={false}>
         {parties.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No parties added yet</Text>

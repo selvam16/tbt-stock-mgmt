@@ -159,7 +159,7 @@ export default function CompaniesScreen() {
 
   if (loading) {
     return (
-      <AppLayout title="Companies">
+      <AppLayout title="Companies" isHome={false}>
         <View style={styles.loading}>
           <Text>Loading...</Text>
         </View>
@@ -168,7 +168,7 @@ export default function CompaniesScreen() {
   }
 
   return (
-    <AppLayout title={`Companies for ${party?.name || "Party"}`}>
+    <AppLayout title={`Companies for ${party?.name || "Party"}`} isHome={false}>
       <View style={styles.container}>
         {companies.length === 0 ? (
           <View style={styles.empty}>

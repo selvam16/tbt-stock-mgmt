@@ -13,6 +13,8 @@ interface ItemCardProps {
   source?: "add" | "unload";
   vehicleId?: string;
   partyId?: string;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export default function ItemCard({
@@ -22,9 +24,12 @@ export default function ItemCard({
   source = "add",
   vehicleId,
   partyId,
+  isSelected = false,
+  onToggleSelect,
 }: ItemCardProps) {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isOutOfStock = item.quantity === 0;
 
   const handleDelete = () => {
     Alert.alert(
@@ -125,20 +130,49 @@ export default function ItemCard({
   return (
     <>
       <View style={styles.itemCard}>
-        <View style={styles.info}>
+        {onToggleSelect && source === "add" && (
+          <View style={styles.checkboxWrapper}>
+            <TouchableOpacity
+              onPress={onToggleSelect}
+              disabled={loading || isOutOfStock}
+              style={styles.checkboxTouchable}
+            >
+              <MaterialIcons
+                name={isSelected ? "check-box" : "check-box-outline-blank"}
+                size={24}
+                color={isOutOfStock ? colors.textSecondary : colors.primary}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={[styles.info, isOutOfStock && styles.outOfStockInfo]}>
           <Text style={styles.name}>{formatters.itemName(item.itemName)}</Text>
           <Text style={styles.detail}>
             {formatters.label("QTY")}: {item.quantity}
+            {isOutOfStock && (
+              <Text style={styles.outOfStockLabel}> (Out of Stock)</Text>
+            )}
           </Text>
         </View>
         <View style={styles.actions}>
           {source === "add" && (
             <TouchableOpacity
-              style={[styles.uploadButton]}
+              style={[
+                styles.uploadButton,
+                (isSelected || isOutOfStock) && styles.uploadButtonDisabled,
+              ]}
               onPress={() => setShowQuantityModal(true)}
-              disabled={loading}
+              disabled={loading || isSelected || isOutOfStock}
             >
-              <MaterialIcons name="upload" size={20} color={colors.primary} />
+              <MaterialIcons
+                name="upload"
+                size={20}
+                color={
+                  isSelected || isOutOfStock
+                    ? colors.textSecondary
+                    : colors.primary
+                }
+              />
             </TouchableOpacity>
           )}
           {source !== "add" && (
@@ -185,6 +219,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  checkboxWrapper: {
+    marginRight: 12,
+  },
+  checkboxTouchable: {
+    padding: 4,
+  },
   info: {
     flex: 1,
   },
@@ -209,6 +249,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.primary,
+  },
+  uploadButtonDisabled: {
+    borderColor: colors.border,
+    opacity: 0.5,
+  },
+  outOfStockInfo: {
+    opacity: 0.6,
+  },
+  outOfStockLabel: {
+    color: "#ef4444",
+    fontWeight: "500",
+    fontSize: 12,
   },
   editButton: {
     padding: 8,

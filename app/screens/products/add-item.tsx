@@ -234,6 +234,7 @@ export default function AddItemScreen() {
           ? "Edit Item"
           : `Add Item for ${company?.companyName || companyName || "Company"}`
       }
+      isHome={false}
     >
       <View style={styles.container}>
         <View style={styles.fieldContainer}>

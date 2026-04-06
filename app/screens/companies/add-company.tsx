@@ -236,7 +236,10 @@ export default function AddCompanyScreen() {
   };
 
   return (
-    <AppLayout title={isEditing ? "Edit Company" : "Add Company"}>
+    <AppLayout
+      title={isEditing ? "Edit Company" : "Add Company"}
+      isHome={false}
+    >
       <View style={styles.container}>
         <View style={styles.content}>
           {/* Company Name Field */}
@@ -341,6 +344,7 @@ export default function AddCompanyScreen() {
                 mode="date"
                 display="default"
                 onChange={handleDateChange}
+                maximumDate={new Date()}
               />
             )}
           </View>

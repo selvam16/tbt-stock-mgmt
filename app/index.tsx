@@ -62,6 +62,7 @@ export default function Home() {
     <AppLayout
       title="Dashboard"
       hideClose
+      isHome={true}
       footer={
         <View style={styles.footerContainer}>
           <TouchableOpacity

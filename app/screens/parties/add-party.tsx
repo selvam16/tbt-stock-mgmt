@@ -146,7 +146,7 @@ export default function AddPartyScreen() {
   };
 
   return (
-    <AppLayout title={isEditing ? "Edit Party" : "Add Party"}>
+    <AppLayout title={isEditing ? "Edit Party" : "Add Party"} isHome={false}>
       <View style={styles.container}>
         <View style={styles.content}>
           {/* Title Dropdown */}

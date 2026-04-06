@@ -66,9 +66,13 @@ export const storage = {
       const exists = await FileSystem.getInfoAsync(DB_FILE);
       if (!exists.exists) {
         const godowns = [];
-        for (let i = 1; i <= 10; i++) {
+        for (let i = 1; i <= 7; i++) {
           godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
         }
+        for (let i = 1; i <= 7; i++) {
+          godowns.push({ id: createId(), name: `KS-${i.toString().padStart(2, '0')}` });
+        }
+        godowns.push({ id: createId(), name: 'office' });
         await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
       } else {
         // Check if it's the old format (array), migrate
@@ -76,16 +80,24 @@ export const storage = {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed)) {
           const godowns = [];
-          for (let i = 1; i <= 10; i++) {
+          for (let i = 1; i <= 7; i++) {
             godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
           }
+          for (let i = 1; i <= 7; i++) {
+            godowns.push({ id: createId(), name: `KS-${i.toString().padStart(2, '0')}` });
+          }
+          godowns.push({ id: createId(), name: 'office' });
           await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
         } else if (!parsed.godowns) {
           // Add godowns if missing
           const godowns = [];
-          for (let i = 1; i <= 10; i++) {
+          for (let i = 1; i <= 7; i++) {
             godowns.push({ id: createId(), name: `KA-${i.toString().padStart(2, '0')}` });
           }
+          for (let i = 1; i <= 7; i++) {
+            godowns.push({ id: createId(), name: `KS-${i.toString().padStart(2, '0')}` });
+          }
+          godowns.push({ id: createId(), name: 'office' });
           parsed.godowns = godowns;
           parsed.items = parsed.items || [];
           parsed.vehicles = parsed.vehicles || [];
@@ -441,6 +453,21 @@ export const storage = {
       return newStock;
     } catch (error) {
       console.error("Error removing godown stock:", error);
+      throw error;
+    }
+  },
+
+  async updateGodownStock(stock: GodownStock): Promise<GodownStock> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      db.godownStocks = (db.godownStocks || []).map((s: GodownStock) =>
+        s.id === stock.id ? stock : s,
+      );
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return stock;
+    } catch (error) {
+      console.error("Error updating godown stock:", error);
       throw error;
     }
   },

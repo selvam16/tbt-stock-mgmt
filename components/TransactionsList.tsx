@@ -22,11 +22,15 @@ interface TransactionDetail {
 interface TransactionsListProps {
   transactions: TransactionDetail[];
   loading: boolean;
+  onDeleteTransaction?: (stockId: string) => void;
+  onEditTransaction?: (stockId: string, newQuantity: number) => void;
 }
 
 export default function TransactionsList({
   transactions,
   loading,
+  onDeleteTransaction,
+  onEditTransaction,
 }: TransactionsListProps) {
   const [activeTab, setActiveTab] = useState<"load" | "unload" | "all">("all");
 
@@ -98,6 +102,8 @@ export default function TransactionsList({
               item={item.item}
               company={item.company}
               type={item.type}
+              onDelete={onDeleteTransaction}
+              onEdit={onEditTransaction}
             />
           )}
           scrollEnabled={true}

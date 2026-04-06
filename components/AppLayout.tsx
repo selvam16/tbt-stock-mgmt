@@ -1,3 +1,5 @@
+import { colors } from "@/theme/color";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,6 +9,7 @@ type Props = {
   children: React.ReactNode;
   hideClose?: boolean;
   footer?: React.ReactNode;
+  isHome?: boolean;
 };
 
 export default function AppLayout({
@@ -14,6 +17,7 @@ export default function AppLayout({
   children,
   hideClose,
   footer,
+  isHome,
 }: Props) {
   const router = useRouter();
 
@@ -23,11 +27,21 @@ export default function AppLayout({
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
 
-        {!hideClose && (
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.close}>✕</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {!isHome && (
+            <TouchableOpacity
+              onPress={() => router.push("/")}
+              style={styles.homeButton}
+            >
+              <MaterialIcons name="home" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {!hideClose && (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text style={styles.close}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* CONTENT */}
@@ -56,6 +70,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "bold",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  homeButton: {
+    padding: 8,
   },
   close: {
     fontSize: 20,

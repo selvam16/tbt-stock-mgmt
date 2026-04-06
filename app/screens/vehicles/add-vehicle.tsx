@@ -24,13 +24,10 @@ export default function AddVehicleScreen() {
   const [formData, setFormData] = useState({
     vehicleNumber: "",
     nameBoard: "",
-    vehicleType: "Commercial",
+    vehicleType: "",
     deliveryAt: "",
     date: new Date(),
   });
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-
-  const vehicleTypes = ["Commercial", "Passenger", "Heavy", "Light", "Other"];
 
   const loadVehicleData = useCallback(
     async (id: string) => {
@@ -83,11 +80,10 @@ export default function AddVehicleScreen() {
     setFormData({
       vehicleNumber: "",
       nameBoard: "",
-      vehicleType: "Commercial",
+      vehicleType: "",
       deliveryAt: "",
       date: new Date(),
     });
-    setShowTypeDropdown(false);
     setShowDatePicker(false);
   };
 
@@ -98,6 +94,10 @@ export default function AddVehicleScreen() {
     }
     if (!formData.nameBoard.trim()) {
       Alert.alert("Validation Error", "Name board is required");
+      return false;
+    }
+    if (!formData.vehicleType.trim()) {
+      Alert.alert("Validation Error", "Vehicle type is required");
       return false;
     }
     if (!formData.deliveryAt.trim()) {
@@ -173,7 +173,10 @@ export default function AddVehicleScreen() {
   };
 
   return (
-    <AppLayout title={isEditing ? "Edit Vehicle" : "Add Vehicle"}>
+    <AppLayout
+      title={isEditing ? "Edit Vehicle" : "Add Vehicle"}
+      isHome={false}
+    >
       <View style={styles.container}>
         <View style={styles.content}>
           {/* Vehicle Number Field */}
@@ -205,47 +208,17 @@ export default function AddVehicleScreen() {
             />
           </View>
 
-          {/* Vehicle Type Dropdown */}
+          {/* Vehicle Type Field */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Vehicle Type *</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowTypeDropdown(!showTypeDropdown)}
-              disabled={loading}
-            >
-              <Text style={styles.dropdownButtonText}>
-                {formData.vehicleType}
-              </Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </TouchableOpacity>
-            {showTypeDropdown && (
-              <View style={styles.dropdownMenu}>
-                {vehicleTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.dropdownOption,
-                      formData.vehicleType === type &&
-                        styles.dropdownOptionSelected,
-                    ]}
-                    onPress={() => {
-                      setFormData((prev) => ({ ...prev, vehicleType: type }));
-                      setShowTypeDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownOptionText,
-                        formData.vehicleType === type &&
-                          styles.dropdownOptionTextSelected,
-                      ]}
-                    >
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., Commercial, Passenger, Heavy, Light"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.vehicleType}
+              onChangeText={(value) => handleInputChange("vehicleType", value)}
+              editable={!loading}
+            />
           </View>
 
           {/* Delivery Location Field */}
@@ -281,6 +254,7 @@ export default function AddVehicleScreen() {
                 mode="date"
                 display="default"
                 onChange={handleDateChange}
+                maximumDate={new Date()}
               />
             )}
           </View>

@@ -5,7 +5,7 @@ import { formatters } from "@/lib/formatters";
 import { Company, GodownStock, Item, storage } from "@/lib/storage";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 interface TransactionDetail {
   stock: GodownStock;
@@ -87,17 +87,66 @@ export default function GodownDetailsScreen() {
     }, [loadTransactions]),
   );
 
+  const handleDeleteTransaction = async (stockId: string) => {
+    try {
+      await storage.deleteGodownStock(stockId);
+      Alert.alert(
+        "Success",
+        "Item removed from loaded items and moved to unload",
+      );
+      loadTransactions();
+    } catch (error) {
+      Alert.alert("Error", "Failed to remove item");
+      console.error(error);
+    }
+  };
+
+  const handleEditTransaction = async (
+    stockId: string,
+    newQuantity: number,
+  ) => {
+    try {
+      // Get the stock to update
+      const allStocks = await storage.getGodownStocks();
+      const stockToUpdate = allStocks.find((s) => s.id === stockId);
+
+      if (!stockToUpdate) {
+        Alert.alert("Error", "Item not found");
+        return;
+      }
+
+      // Update with new quantity (keep as negative for loaded items)
+      const updatedStock = {
+        ...stockToUpdate,
+        loadedQuantity: -newQuantity, // Keep negative for load type
+      };
+
+      await storage.updateGodownStock(updatedStock);
+      Alert.alert("Success", "Item quantity updated successfully");
+      loadTransactions();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update item quantity");
+      console.error(error);
+    }
+  };
+
   return (
     <AppLayout
       title={`${formatters.label("GODOWN")}: ${formatters.godownName(godownNameStr)}`}
       hideClose={false}
+      isHome={false}
     >
       <View style={styles.container}>
         <GodownSummary
           totalLoaded={totalLoaded}
           totalUnloaded={totalUnloaded}
         />
-        <TransactionsList transactions={transactions} loading={loading} />
+        <TransactionsList
+          transactions={transactions}
+          loading={loading}
+          onDeleteTransaction={handleDeleteTransaction}
+          onEditTransaction={handleEditTransaction}
+        />
       </View>
     </AppLayout>
   );

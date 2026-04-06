@@ -110,7 +110,7 @@ export default function LoadScreen() {
 
   return (
     <View style={styles.container}>
-      <AppLayout title="Load Stock">
+      <AppLayout title="Load Stock" isHome={false}>
         {parties.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No parties added yet</Text>

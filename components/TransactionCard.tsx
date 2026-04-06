@@ -1,13 +1,16 @@
 import { formatters } from "@/lib/formatters";
 import { Company, GodownStock, Item } from "@/lib/storage";
 import { colors } from "@/theme/color";
-import { StyleSheet, Text, View } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface TransactionCardProps {
   stock: GodownStock;
   item: Item | null;
   company: Company | null;
   type: "load" | "unload";
+  onDelete?: (stockId: string) => void;
+  onEdit?: (stockId: string, newQuantity: number) => void;
 }
 
 export default function TransactionCard({
@@ -15,7 +18,66 @@ export default function TransactionCard({
   item,
   company,
   type,
+  onDelete,
+  onEdit,
 }: TransactionCardProps) {
+  const handleDelete = () => {
+    if (type !== "load") return; // Only allow delete for loaded items
+
+    Alert.alert(
+      "Remove Loaded Item",
+      `Are you sure you want to remove ${item?.itemName || "this item"} from the loaded items? It will be moved back to unload stock.`,
+      [
+        {
+          text: "Cancel",
+          onPress: () => {},
+          style: "cancel",
+        },
+        {
+          text: "Remove",
+          onPress: () => {
+            onDelete?.(stock.id);
+          },
+          style: "destructive",
+        },
+      ],
+    );
+  };
+
+  const handleEdit = () => {
+    if (type !== "load") return; // Only allow edit for loaded items
+
+    const currentQty = Math.abs(stock.loadedQuantity);
+    Alert.prompt(
+      "Edit Loaded Quantity",
+      `Enter new quantity for ${item?.itemName || "this item"}`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Update",
+          onPress: (newQtyStr: string | undefined) => {
+            if (!newQtyStr) return;
+            const newQty = Number(newQtyStr);
+            if (!Number.isInteger(newQty) || newQty <= 0) {
+              Alert.alert("Error", "Quantity must be a positive integer");
+              return;
+            }
+            if (newQty > 1000) {
+              Alert.alert("Error", "Quantity cannot exceed 1000");
+              return;
+            }
+            onEdit?.(stock.id, newQty);
+          },
+        },
+      ],
+      "plain-text",
+      currentQty.toString(),
+      "numeric",
+    );
+  };
   return (
     <View
       style={[
@@ -29,7 +91,29 @@ export default function TransactionCard({
             {type === "load" ? "📦 LOAD" : "📋 UNLOAD"}
           </Text>
         </View>
-        <Text style={styles.dateText}>{formatters.date(stock.date)}</Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.dateText}>{formatters.date(stock.date)}</Text>
+          {type === "load" && (onEdit || onDelete) && (
+            <View style={styles.actionButtons}>
+              {onEdit && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={handleEdit}
+                >
+                  <MaterialIcons name="edit" size={18} color="#2563eb" />
+                </TouchableOpacity>
+              )}
+              {onDelete && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={handleDelete}
+                >
+                  <MaterialIcons name="close" size={20} color="#ef4444" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.transactionDetails}>
@@ -98,6 +182,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.1)",
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   typeIndicator: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -138,5 +227,20 @@ const styles = StyleSheet.create({
   unloadQuantity: {
     color: "#22c55e",
     fontWeight: "700",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: 4,
+    alignItems: "center",
+  },
+  editButton: {
+    padding: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteButton: {
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

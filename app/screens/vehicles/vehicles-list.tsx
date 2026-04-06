@@ -83,7 +83,7 @@ export default function VehiclesListScreen() {
 
   if (loading) {
     return (
-      <AppLayout title="Loading Vehicles">
+      <AppLayout title="Loading Vehicles" isHome={false}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>Loading...</Text>
         </View>
@@ -93,7 +93,10 @@ export default function VehiclesListScreen() {
 
   return (
     <View style={styles.container}>
-      <AppLayout title={party ? `${party.name}'s Vehicles` : "Vehicles"}>
+      <AppLayout
+        title={party ? `${party.name}'s Vehicles` : "Vehicles"}
+        isHome={false}
+      >
         {vehicles.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No vehicles added yet</Text>
