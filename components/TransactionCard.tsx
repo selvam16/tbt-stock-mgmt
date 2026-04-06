@@ -1,5 +1,5 @@
 import { formatters } from "@/lib/formatters";
-import { Company, GodownStock, Item } from "@/lib/storage";
+import { Company, GodownStock, Item, Party } from "@/lib/storage";
 import { colors } from "@/theme/color";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -8,6 +8,7 @@ interface TransactionCardProps {
   stock: GodownStock;
   item: Item | null;
   company: Company | null;
+  party: Party | null;
   type: "load" | "unload";
   onDelete?: (stockId: string) => void;
   onEdit?: (stockId: string, newQuantity: number) => void;
@@ -17,6 +18,7 @@ export default function TransactionCard({
   stock,
   item,
   company,
+  party,
   type,
   onDelete,
   onEdit,
@@ -93,7 +95,7 @@ export default function TransactionCard({
         </View>
         <View style={styles.headerRight}>
           <Text style={styles.dateText}>{formatters.date(stock.date)}</Text>
-          {type === "load" && (onEdit || onDelete) && (
+          {/* {type === "load" && (onEdit || onDelete) && (
             <View style={styles.actionButtons}>
               {onEdit && (
                 <TouchableOpacity
@@ -112,11 +114,16 @@ export default function TransactionCard({
                 </TouchableOpacity>
               )}
             </View>
-          )}
+          )} */}
         </View>
       </View>
 
       <View style={styles.transactionDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>{formatters.label("PARTY")}</Text>
+          <Text style={styles.detailValue}>{party?.name || "Unknown"}</Text>
+        </View>
+
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>{formatters.label("COMPANY")}</Text>
           <Text style={styles.detailValue}>

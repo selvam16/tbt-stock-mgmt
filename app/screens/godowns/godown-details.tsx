@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import GodownSummary from "@/components/GodownSummary";
 import TransactionsList from "@/components/TransactionsList";
 import { formatters } from "@/lib/formatters";
-import { Company, GodownStock, Item, storage } from "@/lib/storage";
+import { Company, GodownStock, Item, Party, storage } from "@/lib/storage";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -11,6 +11,7 @@ interface TransactionDetail {
   stock: GodownStock;
   item: Item | null;
   company: Company | null;
+  party: Party | null;
   type: "load" | "unload";
 }
 
@@ -22,42 +23,51 @@ export default function GodownDetailsScreen() {
   const [loading, setLoading] = useState(false);
   const [totalLoaded, setTotalLoaded] = useState(0);
   const [totalUnloaded, setTotalUnloaded] = useState(0);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
 
   const loadTransactions = useCallback(async () => {
     if (!godownNameStr) return;
 
     setLoading(true);
     try {
-      const [allStocks, allItems, allCompanies] = await Promise.all([
-        storage.getGodownStocks(),
-        storage.getItems(),
-        storage.getCompanies(),
-      ]);
+      const [allStocks, allItems, allCompanies, allParties] = await Promise.all(
+        [
+          storage.getGodownStocks(),
+          storage.getItems(),
+          storage.getCompanies(),
+          storage.getParties(),
+        ],
+      );
 
       // Filter stocks for this godown
       const godownStocks = allStocks.filter(
         (stock) => stock.godownName === godownNameStr,
       );
 
-      // Map to transaction details with company and item info
+      // Map to transaction details with company, party and item info
       const txns: TransactionDetail[] = godownStocks.map((stock) => {
         const item = allItems.find((i) => i.id === stock.itemId) || null;
         const company = item
           ? allCompanies.find((c) => c.id === item.companyId) || null
+          : null;
+        const party = company
+          ? allParties.find((p) => p.id === company.partyId) || null
           : null;
 
         return {
           stock,
           item,
           company,
+          party,
           type: stock.loadedQuantity < 0 ? "load" : "unload",
         };
       });
 
-      // Sort by date descending (newest first)
+      // Sort by date ascending (oldest first)
       txns.sort(
         (a, b) =>
-          new Date(b.stock.date).getTime() - new Date(a.stock.date).getTime(),
+          new Date(a.stock.date).getTime() - new Date(b.stock.date).getTime(),
       );
 
       // Calculate totals
@@ -74,6 +84,22 @@ export default function GodownDetailsScreen() {
       setTransactions(txns);
       setTotalLoaded(loaded);
       setTotalUnloaded(unloaded);
+
+      // Filter companies and parties to only those in this godown's transactions
+      const godownPartyIds = new Set<string>();
+      const godownCompanyIds = new Set<string>();
+
+      txns.forEach((txn) => {
+        if (txn.company) {
+          godownCompanyIds.add(txn.company.id);
+          if (txn.party) {
+            godownPartyIds.add(txn.party.id);
+          }
+        }
+      });
+
+      setCompanies(allCompanies.filter((c) => godownCompanyIds.has(c.id)));
+      setParties(allParties.filter((p) => godownPartyIds.has(p.id)));
     } catch (error) {
       console.error("Error loading transactions:", error);
     } finally {
@@ -144,8 +170,11 @@ export default function GodownDetailsScreen() {
         <TransactionsList
           transactions={transactions}
           loading={loading}
+          godownName={godownNameStr}
           onDeleteTransaction={handleDeleteTransaction}
           onEditTransaction={handleEditTransaction}
+          companies={companies}
+          parties={parties}
         />
       </View>
     </AppLayout>
