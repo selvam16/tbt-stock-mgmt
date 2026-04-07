@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import AppLayout from "../components/AppLayout";
+import { DevMenu } from "../components/DevMenu";
 
 interface GodownWithQuantity extends Godown {
   totalQuantity: number;
@@ -20,6 +21,21 @@ export default function Home() {
   const router = useRouter();
   const [godowns, setGodowns] = useState<GodownWithQuantity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [devMenuVisible, setDevMenuVisible] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+
+  const handleDevMenuTap = () => {
+    setTapCount((prev) => {
+      const newCount = prev + 1;
+      if (newCount === 5) {
+        setDevMenuVisible(true);
+        return 0;
+      }
+      // Reset after 2 seconds of inactivity
+      setTimeout(() => setTapCount(0), 2000);
+      return newCount;
+    });
+  };
 
   const loadGodownsWithQuantities = useCallback(async () => {
     setLoading(true);
@@ -59,74 +75,86 @@ export default function Home() {
   );
 
   return (
-    <AppLayout
-      title="Dashboard"
-      hideClose
-      isHome={true}
-      footer={
-        <View style={styles.footerContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.loadBtn]}
-            onPress={() => router.push("/screens/load")}
-          >
-            <Text style={styles.buttonText}>LOAD</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, styles.unloadBtn]}
-            onPress={() => router.push("/screens/unload")}
-          >
-            <Text style={styles.buttonText}>UNLOAD</Text>
-          </TouchableOpacity>
-        </View>
-      }
-    >
-      {/* STOCK */}
-      <Text style={styles.sectionTitle}>Godowns</Text>
-      <TouchableOpacity
-        onPress={() => storage.downloadJSON()}
-        style={{ marginBottom: 12 }}
-      >
-        <Text style={{ color: colors.primary }}>Download Data</Text>
-      </TouchableOpacity>
-
-      {loading ? (
-        <View style={styles.loading}>
-          <Text>Loading godowns...</Text>
-        </View>
-      ) : godowns.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>No godowns found.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={godowns}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          columnWrapperStyle={styles.columnWrapper}
-          scrollEnabled={true}
-          renderItem={({ item }) => (
+    <>
+      <AppLayout
+        title="Dashboard"
+        hideClose
+        isHome={true}
+        footer={
+          <View style={styles.footerContainer}>
             <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/screens/godowns/godown-details",
-                  params: { godownName: item.name },
-                })
-              }
-              activeOpacity={0.7}
-              style={styles.cardWrapper}
+              style={[styles.button, styles.loadBtn]}
+              onPress={() => router.push("/screens/load")}
             >
-              <View style={styles.card}>
-                <Text style={styles.godownLabel}>
-                  {formatters.godownName(item.name)}
-                </Text>
-                <Text style={styles.quantityValue}>{item.totalQuantity}</Text>
-              </View>
+              <Text style={styles.buttonText}>LOAD</Text>
             </TouchableOpacity>
-          )}
-        />
-      )}
-    </AppLayout>
+
+            <TouchableOpacity
+              style={[styles.button, styles.unloadBtn]}
+              onPress={() => router.push("/screens/unload")}
+            >
+              <Text style={styles.buttonText}>UNLOAD</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        {/* STOCK */}
+        <TouchableOpacity
+          onPress={handleDevMenuTap}
+          style={{ marginBottom: 10 }}
+        >
+          <Text style={styles.sectionTitle}>Godowns</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => storage.downloadJSON()}
+          style={{ marginBottom: 12 }}
+        >
+          <Text style={{ color: colors.primary }}>Download Data</Text>
+        </TouchableOpacity>
+
+        {loading ? (
+          <View style={styles.loading}>
+            <Text>Loading godowns...</Text>
+          </View>
+        ) : godowns.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>No godowns found.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={godowns}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            columnWrapperStyle={styles.columnWrapper}
+            scrollEnabled={true}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/screens/godowns/godown-details",
+                    params: { godownName: item.name },
+                  })
+                }
+                activeOpacity={0.7}
+                style={styles.cardWrapper}
+              >
+                <View style={styles.card}>
+                  <Text style={styles.godownLabel}>
+                    {formatters.godownName(item.name)}
+                  </Text>
+                  <Text style={styles.quantityValue}>{item.totalQuantity}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </AppLayout>
+
+      <DevMenu
+        visible={devMenuVisible}
+        onClose={() => setDevMenuVisible(false)}
+      />
+    </>
   );
 }
 
