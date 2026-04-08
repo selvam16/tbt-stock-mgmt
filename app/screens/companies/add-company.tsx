@@ -37,7 +37,7 @@ export default function AddCompanyScreen() {
     false,
     false,
   ]);
-  const [isEditing] = useState(!!companyId);
+  const isEditing = !!companyId;
   const [allCompanyNames, setAllCompanyNames] = useState<string[]>([]);
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState<
@@ -85,8 +85,20 @@ export default function AddCompanyScreen() {
       const company = companies.find((c) => c.id === id);
       if (company) {
         setOriginalCompany(company);
-        // Since we're now in multi-add mode, we don't pre-fill for editing
-        console.log("Company loaded:", company);
+        // Pre-fill the form with the company data for editing
+        const editDate = company.date
+          ? new Date(company.date + "T00:00:00")
+          : new Date();
+        setFormData([
+          {
+            companyName: company.companyName,
+            agentName: company.agentName || "",
+            godownName: company.godownName,
+            date: editDate,
+          },
+          { companyName: "", agentName: "", godownName: "", date: new Date() },
+          { companyName: "", agentName: "", godownName: "", date: new Date() },
+        ]);
       }
     } catch (error) {
       Alert.alert("Error", "Failed to load company data");
@@ -206,39 +218,59 @@ export default function AddCompanyScreen() {
 
     setLoading(true);
     try {
-      for (const company of formData) {
-        // Skip empty rows
-        if (!company.companyName.trim() || !company.godownName.trim()) {
-          continue;
+      if (isEditing && originalCompany) {
+        // Update existing company
+        const firstCompany = formData[0];
+        if (firstCompany.companyName.trim()) {
+          await storage.updateCompany(originalCompany.id, {
+            companyName: firstCompany.companyName.trim(),
+            agentName: firstCompany.agentName.trim() || undefined,
+            godownName: firstCompany.godownName.trim(),
+            date: firstCompany.date.toISOString().split("T")[0],
+          });
+        }
+        Alert.alert("Success", "Company updated successfully", [
+          {
+            text: "Done",
+            onPress: () => router.back(),
+            style: "cancel",
+          },
+        ]);
+      } else {
+        // Add new companies
+        for (const company of formData) {
+          // Skip empty rows
+          if (!company.companyName.trim() || !company.godownName.trim()) {
+            continue;
+          }
+
+          await storage.addCompany({
+            partyId,
+            companyName: company.companyName.trim(),
+            agentName: company.agentName.trim() || undefined,
+            godownName: company.godownName.trim(),
+            date: company.date.toISOString().split("T")[0],
+            source: source as "add" | "unload",
+          });
         }
 
-        // Add new company
-        await storage.addCompany({
-          partyId,
-          companyName: company.companyName.trim(),
-          agentName: company.agentName.trim() || undefined,
-          godownName: company.godownName.trim(),
-          date: company.date.toISOString().split("T")[0],
-          source: source as "add" | "unload",
-        });
-      }
-
-      await loadCompanyNames();
-      Alert.alert("Success", "Companies added successfully", [
-        {
-          text: "Add More",
-          onPress: () => {
-            handleClear();
+        await loadCompanyNames();
+        Alert.alert("Success", "Companies added successfully", [
+          {
+            text: "Add More",
+            onPress: () => {
+              handleClear();
+            },
           },
-        },
-        {
-          text: "Done",
-          onPress: () => router.back(),
-          style: "cancel",
-        },
-      ]);
+          {
+            text: "Done",
+            onPress: () => router.back(),
+            style: "cancel",
+          },
+        ]);
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to save companies. Please try again.");
+      Alert.alert("Error", "Failed to save company. Please try again.");
       console.error(error);
     } finally {
       setLoading(false);
@@ -246,7 +278,10 @@ export default function AddCompanyScreen() {
   };
 
   return (
-    <AppLayout title="Add Companies" isHome={false}>
+    <AppLayout
+      title={isEditing ? "Edit Company" : "Add Companies"}
+      isHome={false}
+    >
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {formData.map((company, index) => (
           <View key={index} style={styles.card}>

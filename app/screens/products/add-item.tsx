@@ -36,7 +36,8 @@ export default function AddItemScreen() {
   ) as "add" | "unload" | undefined;
   const [loading, setLoading] = useState(itemId ? true : false);
   const [company, setCompany] = useState<Company | null>(null);
-  const [isEditing] = useState(!!itemId);
+  const isEditing = !!itemId;
+  const [originalItem, setOriginalItem] = useState<any>(null);
   const [allItemNames, setAllItemNames] = useState<string[]>([]);
   const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
   const [showItemSuggestions, setShowItemSuggestions] = useState<boolean[]>([
@@ -91,9 +92,15 @@ export default function AddItemScreen() {
       const items = await storage.getItems();
       const item = items.find((i) => i.id === id);
       if (item) {
-        // Since we're now in multi-add mode, we don't pre-fill for editing
-        // This function is kept for reference but not used in current flow
-        console.log("Item loaded:", item);
+        setOriginalItem(item);
+        // Pre-fill the form with the item data for editing
+        setFormData([
+          { itemName: item.itemName, quantity: item.quantity.toString() },
+          { itemName: "", quantity: "" },
+          { itemName: "", quantity: "" },
+          { itemName: "", quantity: "" },
+          { itemName: "", quantity: "" },
+        ]);
       }
     } catch (error) {
       console.error("Error loading item:", error);
@@ -188,46 +195,66 @@ export default function AddItemScreen() {
 
     setLoading(true);
     try {
-      for (const item of formData) {
-        // Skip empty rows
-        if (!item.itemName.trim() || !item.quantity.trim()) {
-          continue;
-        }
-
-        const quantity = Number(item.quantity);
-
-        // Add new item
-        const newItem = await storage.addItem({
-          companyId,
-          itemName: item.itemName.trim(),
-          quantity,
-        });
-
-        // If in unload mode, automatically add to godown stock
-        if (source === "unload" && company) {
-          await storage.addGodownStock({
-            itemId: newItem.id,
-            godownName: company.godownName,
-            loadedQuantity: quantity,
-            vehicleNumber: "Received",
-            date: company.date,
+      if (isEditing && originalItem) {
+        // Update existing item
+        const firstItem = formData[0];
+        if (firstItem.itemName.trim() && firstItem.quantity.trim()) {
+          const quantity = Number(firstItem.quantity);
+          await storage.updateItem(originalItem.id, {
+            itemName: firstItem.itemName.trim(),
+            quantity,
           });
         }
-      }
+        Alert.alert("Success", "Item updated successfully", [
+          {
+            text: "Done",
+            onPress: () => router.back(),
+            style: "cancel",
+          },
+        ]);
+      } else {
+        // Add new items
+        for (const item of formData) {
+          // Skip empty rows
+          if (!item.itemName.trim() || !item.quantity.trim()) {
+            continue;
+          }
 
-      Alert.alert("Success", "Items added successfully", [
-        {
-          text: "Add More",
-          onPress: () => handleClear(),
-        },
-        {
-          text: "Done",
-          onPress: () => router.back(),
-          style: "cancel",
-        },
-      ]);
+          const quantity = Number(item.quantity);
+
+          // Add new item
+          const newItem = await storage.addItem({
+            companyId,
+            itemName: item.itemName.trim(),
+            quantity,
+          });
+
+          // If in unload mode, automatically add to godown stock
+          if (source === "unload" && company) {
+            await storage.addGodownStock({
+              itemId: newItem.id,
+              godownName: company.godownName,
+              loadedQuantity: quantity,
+              vehicleNumber: "Received",
+              date: company.date,
+            });
+          }
+        }
+
+        Alert.alert("Success", "Items added successfully", [
+          {
+            text: "Add More",
+            onPress: () => handleClear(),
+          },
+          {
+            text: "Done",
+            onPress: () => router.back(),
+            style: "cancel",
+          },
+        ]);
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to save items. Please try again.");
+      Alert.alert("Error", "Failed to save item. Please try again.");
       console.error(error);
     } finally {
       setLoading(false);
@@ -236,7 +263,11 @@ export default function AddItemScreen() {
 
   return (
     <AppLayout
-      title={`Add Items for ${company?.companyName || companyName || "Company"}`}
+      title={
+        isEditing
+          ? `Edit Item from ${company?.companyName || companyName || "Company"}`
+          : `Add Items for ${company?.companyName || companyName || "Company"}`
+      }
       isHome={false}
     >
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
