@@ -99,7 +99,7 @@ export const generateMockData = () => {
                 date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
                     .toISOString()
                     .split("T")[0],
-                source: Math.random() > 0.5 ? "add" : "unload",
+                source: "unload",
                 createdAt: Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000,
             };
             companies.push(company);

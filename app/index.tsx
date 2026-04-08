@@ -7,8 +7,12 @@ import { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,6 +29,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [devMenuVisible, setDevMenuVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
+  const [parties, setParties] = useState<any[]>([]);
+  const [partyNames, setPartyNames] = useState<string[]>([]);
+  const [partySearchText, setPartySearchText] = useState("");
+  const [partySuggestions, setPartySuggestions] = useState<any[]>([]);
+  const [showPartySuggestions, setShowPartySuggestions] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const handleDevMenuTap = () => {
     setTapCount((prev) => {
@@ -70,13 +81,74 @@ export default function Home() {
     }
   }, []);
 
+  const loadPartyNames = useCallback(async () => {
+    try {
+      const allParties = await storage.getParties();
+      setParties(allParties);
+      const names = allParties.map((p) => `${p.title} - ${p.name}`);
+      setPartyNames(names);
+    } catch (error) {
+      console.error("Error loading parties:", error);
+    }
+  }, []);
+
+  const handlePartySearch = (text: string) => {
+    const updated = text.trimStart();
+    setPartySearchText(updated);
+
+    if (updated.length === 0) {
+      setPartySuggestions([]);
+      setShowPartySuggestions(false);
+      return;
+    }
+
+    const matches = parties.filter(
+      (party) =>
+        `${party.title} - ${party.name}`
+          .toLowerCase()
+          .includes(updated.toLowerCase()) &&
+        `${party.title} - ${party.name}`.toLowerCase() !==
+          updated.toLowerCase(),
+    );
+    setPartySuggestions(matches);
+    setShowPartySuggestions(matches.length > 0);
+  };
+
+  const handleSelectPartyForPDF = useCallback(async (party: any) => {
+    setPartySuggestions([]);
+    setShowPartySuggestions(false);
+    setIsGeneratingPDF(true);
+
+    try {
+      await downloadUnloadStocksPDF(party.id);
+      // Close modal after PDF generation
+      setShowPDFModal(false);
+      setPartySearchText("");
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  }, []);
+
+  const openPDFModal = useCallback(async () => {
+    try {
+      const allParties = await storage.getParties();
+      setParties(allParties);
+      setShowPDFModal(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to load parties");
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadGodownsWithQuantities();
-    }, [loadGodownsWithQuantities]),
+      loadPartyNames();
+    }, [loadGodownsWithQuantities, loadPartyNames]),
   );
 
-  const downloadUnloadStocksPDF = async () => {
+  const downloadUnloadStocksPDF = async (selectedPartyId: string) => {
     try {
       // Fetch all required data
       const [allStocks, allItems, allCompanies] = await Promise.all([
@@ -90,81 +162,196 @@ export default function Home() {
         allCompanies.filter((c) => c.source === "unload").map((c) => c.id),
       );
 
-      const unloadStocks = allStocks.filter((stock) => {
-        const item = allItems.find((i) => i.id === stock.itemId);
-        return item && unloadCompanyIds.has(item.companyId);
-      });
+      console.log("All companies:", allCompanies.length);
+      console.log("Unload companies count:", unloadCompanyIds.size);
+      console.log(
+        "Unload companies source debug:",
+        allCompanies.map((c) => ({
+          id: c.id,
+          partyId: c.partyId,
+          companyName: c.companyName,
+          source: c.source,
+        })),
+      );
 
-      console.log("Unload stocks found:", unloadStocks.length);
-      console.log("Unload company IDs:", Array.from(unloadCompanyIds));
-
-      if (unloadStocks.length === 0) {
-        Alert.alert("No Data", "No unload stocks found");
+      if (unloadCompanyIds.size === 0) {
+        Alert.alert("No Data", "No unload companies found");
         return;
       }
 
       // Fetch parties for grouping
       const allParties = await storage.getParties();
 
-      // Group by party
+      // Group by party, then by company, then by item
       const groupedByParty = new Map<
         string,
         {
           partyName: string;
-          total: number;
+          partyTotal: number;
+          companies: Map<
+            string,
+            {
+              companyName: string;
+              unloadedDate: string;
+              godownName: string;
+              items: Array<{
+                itemName: string;
+                quantity: number;
+              }>;
+            }
+          >;
         }
       >();
 
-      // Process each unload stock
-      unloadStocks.forEach((stock) => {
+      // First, initialize all parties with their unload companies
+      allParties
+        .filter((party) => party.id === selectedPartyId)
+        .forEach((party) => {
+          const partyCompanies = allCompanies.filter(
+            (c) => c.partyId === party.id && unloadCompanyIds.has(c.id),
+          );
+
+          console.log(
+            `Party: ${party.name}, Unload companies: ${partyCompanies.length}`,
+            partyCompanies.map((c) => c.companyName),
+          );
+
+          if (partyCompanies.length > 0) {
+            const partyName =
+              `${party.title || ""} - ${party.name || ""}`.trim();
+
+            if (!groupedByParty.has(party.id)) {
+              groupedByParty.set(party.id, {
+                partyName,
+                partyTotal: 0,
+                companies: new Map(),
+              });
+            }
+
+            const partyGroup = groupedByParty.get(party.id)!;
+
+            // Add all unload companies for this party
+            partyCompanies.forEach((company) => {
+              if (!partyGroup.companies.has(company.id)) {
+                partyGroup.companies.set(company.id, {
+                  companyName: company.companyName,
+                  godownName: company.godownName || "",
+                  unloadedDate: company.date || "",
+                  items: [],
+                });
+              }
+            });
+          }
+        });
+
+      // Then process stocks and add items to companies
+      const unloadStocks = allStocks.filter((stock) => {
         const item = allItems.find((i) => i.id === stock.itemId);
-        if (!item) {
-          console.log("Item not found for stock:", stock.itemId);
-          return;
-        }
-
-        const company = allCompanies.find((c) => c.id === item.companyId);
-        if (!company) {
-          console.log("Company not found for item:", item.companyId);
-          return;
-        }
-
-        const party = allParties.find((p) => p.id === company.partyId);
-        if (!party) {
-          console.log("Party not found for company:", company.partyId);
-          return;
-        }
-
-        const partyId = party.id;
-        const partyName = `${party.title || ""} - ${party.name || ""}`.trim();
-
-        if (!groupedByParty.has(partyId)) {
-          groupedByParty.set(partyId, {
-            partyName,
-            total: 0,
-          });
-        }
-
-        const group = groupedByParty.get(partyId)!;
-        group.total += stock.loadedQuantity;
+        return item && unloadCompanyIds.has(item.companyId);
       });
 
-      console.log("Grouped by party, total parties:", groupedByParty.size);
-      console.log("Grouped parties:", Array.from(groupedByParty.values()));
+      // Process each unload stock and add items to respective companies
+      unloadStocks.forEach((stock) => {
+        const item = allItems.find((i) => i.id === stock.itemId);
+        if (!item) return;
+
+        const company = allCompanies.find((c) => c.id === item.companyId);
+        if (!company) return;
+
+        const party = allParties.find((p) => p.id === company.partyId);
+        if (!party) return;
+
+        const partyId = party.id;
+        const partyGroup = groupedByParty.get(partyId);
+        if (!partyGroup) return;
+
+        // Update party total
+        partyGroup.partyTotal += stock.loadedQuantity;
+
+        // Add or update item in company
+        const companyGroup = partyGroup.companies.get(company.id);
+        if (!companyGroup) return;
+
+        const existingItem = companyGroup.items.find(
+          (i) => i.itemName === item.itemName,
+        );
+        if (existingItem) {
+          existingItem.quantity += stock.loadedQuantity;
+        } else {
+          companyGroup.items.push({
+            itemName: item.itemName,
+            quantity: stock.loadedQuantity,
+          });
+        }
+      });
 
       // Calculate grand total
       const grandTotal = Array.from(groupedByParty.values()).reduce(
-        (sum, group) => sum + group.total,
+        (sum, party) => sum + party.partyTotal,
         0,
       );
 
-      // Generate party summary rows - explicitly iterate through all parties
-      let partySummaryHTML = "";
-      Array.from(groupedByParty.values()).forEach((group) => {
-        partySummaryHTML += `
-        <div style="display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #333; font-size: 13px;">
-          <span>${group.partyName}</span>
-          <span style="font-weight: bold; color: #007AFF;">${group.total}</span>
+      // Generate detailed HTML with parties, companies, and items
+      let detailedHTML = "";
+      Array.from(groupedByParty.values()).forEach((partyGroup) => {
+        console.log(
+          `Generating PDF for party: ${partyGroup.partyName}, companies count: ${partyGroup.companies.size}`,
+        );
+        console.log(
+          "Companies in party:",
+          Array.from(partyGroup.companies.values()).map((c) => c.companyName),
+        );
+        // Party header
+        detailedHTML += `
+        <div style="display: flex; justify-content: space-between; padding: 12px; background-color: #007AFF; color: white; font-weight: bold; font-size: 14px; margin-top: 15px; border-radius: 3px;">
+          <span>${partyGroup.partyName}</span>
+          <span>${partyGroup.partyTotal}</span>
+        </div>
+      `;
+
+        // Companies in 2-column layout
+        const companies = Array.from(partyGroup.companies.values());
+        detailedHTML += `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; width: 100%;">
+      `;
+
+        companies.forEach((companyGroup) => {
+          // Calculate total quantity for this company
+          const companyTotal = companyGroup.items.reduce(
+            (sum, item) => sum + item.quantity,
+            0,
+          );
+
+          detailedHTML += `
+          <div style="border: 1px solid #ddd; border-radius: 3px; overflow: hidden; min-width: 0;">
+            <div style="background-color: #FFD700; padding: 10px; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
+              <div>
+              <span style="flex: 0 0 auto;">${companyGroup.companyName}</span>
+              <span style="color: #007AFF; flex: 0 0 auto;">- ${companyTotal}</span>
+              </div>
+              <span style="font-size: 10px; font-weight: normal; color: #333;">(${companyGroup.godownName})</span>
+              <span style="font-size: 10px; font-weight: normal; color: #333;">(${companyGroup.unloadedDate})</span>
+            </div>
+            <div style="padding: 10px;">
+        `;
+
+          // Items under this company
+          companyGroup.items.forEach((item) => {
+            detailedHTML += `
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 11px;">
+                <span style="flex: 1;">${item.itemName}</span>
+                <span style="font-weight: bold; color: #007AFF; min-width: 50px; text-align: right;">${item.quantity}</span>
+              </div>
+            `;
+          });
+
+          detailedHTML += `
+            </div>
+          </div>
+        `;
+        });
+
+        detailedHTML += `
         </div>
       `;
       });
@@ -194,38 +381,32 @@ export default function Home() {
                 font-size: 12px;
                 color: #666;
               }
-              .summary-container {
+              .content-container {
                 background-color: white;
-                border: 2px solid #333;
+                padding: 15px;
                 border-radius: 5px;
-                overflow: hidden;
-                margin-top: 20px;
               }
-              .summary-header {
-                background-color: #007AFF;
-                color: white;
-                padding: 12px;
+              .total-stock-count {
+                text-align: center;
+                padding: 15px;
+                font-size: 16px;
                 font-weight: bold;
-                font-size: 13px;
-                display: flex;
-                align-items: center;
-                border-bottom: 2px solid #333;
-              }
-              .summary-row {
-                display: flex;
-                justify-content: space-between;
-                padding: 12px;
-                border-bottom: 1px solid #333;
-                font-size: 13px;
-              }
-              .summary-total {
-                display: flex;
-                justify-content: space-between;
-                padding: 12px;
-                font-weight: bold;
-                font-size: 13px;
                 color: red;
-                border-top: 2px solid #333;
+                margin-bottom: 15px;
+                background-color: white;
+                border: 2px solid red;
+                border-radius: 5px;
+              }
+              .grand-total {
+                display: flex;
+                justify-content: space-between;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                color: white;
+                background-color: #333;
+                border-radius: 3px;
+                margin-top: 20px;
               }
             </style>
           </head>
@@ -235,13 +416,13 @@ export default function Home() {
               <div class="subtitle">${new Date().toLocaleDateString()}</div>
             </div>
 
-            <div class="summary-container">
-              <div class="summary-header">
-                <span style="flex: 1;">PARTY NAME</span>
-                <span>TOTAL QUANTITY</span>
-              </div>
-              ${partySummaryHTML}
-              <div class="summary-total">
+            <div class="total-stock-count">
+              TOTAL STOCK COUNT: <span style="color: red;">${grandTotal}</span>
+            </div>
+
+            <div class="content-container">
+              ${detailedHTML}
+              <div class="grand-total">
                 <span>GRAND TOTAL</span>
                 <span>${grandTotal}</span>
               </div>
@@ -302,10 +483,7 @@ export default function Home() {
             <Text style={{ color: colors.primary }}>Download Data</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={downloadUnloadStocksPDF}
-            style={styles.downloadLink}
-          >
+          <TouchableOpacity onPress={openPDFModal} style={styles.downloadLink}>
             <Text style={{ color: colors.primary }}>Download Unload PDF</Text>
           </TouchableOpacity>
         </View>
@@ -347,6 +525,78 @@ export default function Home() {
           />
         )}
       </AppLayout>
+
+      {/* PDF Download Modal */}
+      <Modal
+        visible={showPDFModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowPDFModal(false);
+          setPartySearchText("");
+          setPartySuggestions([]);
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Download Unload PDF</Text>
+              <Pressable
+                onPress={() => {
+                  setShowPDFModal(false);
+                  setPartySearchText("");
+                  setPartySuggestions([]);
+                }}
+              >
+                <Text style={styles.closeButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.formLabel}>Select a Party:</Text>
+              <View style={styles.partySearchContainer}>
+                <TextInput
+                  style={styles.partySearchInput}
+                  placeholder="Search party name..."
+                  placeholderTextColor="#999"
+                  value={partySearchText}
+                  onChangeText={handlePartySearch}
+                  editable={!isGeneratingPDF}
+                />
+                {showPartySuggestions && partySuggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    {partySuggestions.map((party) => (
+                      <TouchableOpacity
+                        key={party.id}
+                        style={styles.suggestionOption}
+                        onPress={() => handleSelectPartyForPDF(party)}
+                        disabled={isGeneratingPDF}
+                      >
+                        <View>
+                          <Text style={styles.suggestionOptionText}>
+                            {party.title} - {party.name}
+                          </Text>
+                          {party.city && (
+                            <Text style={styles.suggestionCity}>
+                              {party.city}
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {isGeneratingPDF && (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Generating PDF...</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <DevMenu
         visible={devMenuVisible}
@@ -438,5 +688,92 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    maxHeight: "75%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: colors.textPrimary,
+  },
+  closeButton: {
+    fontSize: 24,
+    color: colors.textSecondary,
+  },
+  modalBody: {
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: colors.textPrimary,
+  },
+  partySearchContainer: {
+    marginBottom: 12,
+  },
+  partySearchInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: "#f9f9f9",
+  },
+  suggestionsContainer: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    maxHeight: 200,
+  },
+  suggestionOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  suggestionOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  suggestionCity: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
