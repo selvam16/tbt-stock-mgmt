@@ -5,12 +5,18 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
+interface ItemFormData {
+  itemName: string;
+  quantity: string;
+}
 
 export default function AddItemScreen() {
   const router = useRouter();
@@ -33,11 +39,20 @@ export default function AddItemScreen() {
   const [isEditing] = useState(!!itemId);
   const [allItemNames, setAllItemNames] = useState<string[]>([]);
   const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
-  const [showItemSuggestions, setShowItemSuggestions] = useState(false);
-  const [formData, setFormData] = useState({
-    itemName: "",
-    quantity: "",
-  });
+  const [showItemSuggestions, setShowItemSuggestions] = useState<boolean[]>([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
+  const [formData, setFormData] = useState<ItemFormData[]>([
+    { itemName: "", quantity: "" },
+    { itemName: "", quantity: "" },
+    { itemName: "", quantity: "" },
+    { itemName: "", quantity: "" },
+    { itemName: "", quantity: "" },
+  ]);
 
   useEffect(() => {
     loadItemNames();
@@ -76,10 +91,9 @@ export default function AddItemScreen() {
       const items = await storage.getItems();
       const item = items.find((i) => i.id === id);
       if (item) {
-        setFormData({
-          itemName: item.itemName,
-          quantity: item.quantity.toString(),
-        });
+        // Since we're now in multi-add mode, we don't pre-fill for editing
+        // This function is kept for reference but not used in current flow
+        console.log("Item loaded:", item);
       }
     } catch (error) {
       console.error("Error loading item:", error);
@@ -88,7 +102,7 @@ export default function AddItemScreen() {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (index: number, field: string, value: string) => {
     if (field === "itemName") {
       const updated = value.trimStart();
       const matches = allItemNames.filter(
@@ -97,39 +111,72 @@ export default function AddItemScreen() {
           name.toLowerCase() !== updated.toLowerCase(),
       );
       setItemSuggestions(matches);
-      setShowItemSuggestions(matches.length > 0 && updated.length > 0);
-      setFormData((prev) => ({ ...prev, itemName: updated }));
+      const newShowSuggestions = [...showItemSuggestions];
+      newShowSuggestions[index] = matches.length > 0 && updated.length > 0;
+      setShowItemSuggestions(newShowSuggestions);
+      setFormData((prev) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], itemName: value.trimStart() };
+        return updated;
+      });
       return;
     }
 
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
-  const handleSelectItemSuggestion = (itemName: string) => {
-    setFormData((prev) => ({ ...prev, itemName }));
+  const handleSelectItemSuggestion = (index: number, itemName: string) => {
+    setFormData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], itemName };
+      return updated;
+    });
     setItemSuggestions([]);
-    setShowItemSuggestions(false);
+    const newShowSuggestions = [...showItemSuggestions];
+    newShowSuggestions[index] = false;
+    setShowItemSuggestions(newShowSuggestions);
   };
 
   const validateForm = (): boolean => {
-    if (!formData.itemName.trim()) {
-      Alert.alert("Validation Error", "Item name is required");
-      return false;
-    }
-    const quantity = Number(formData.quantity);
-    if (
-      !formData.quantity.trim() ||
-      !Number.isInteger(quantity) ||
-      quantity <= 0
-    ) {
-      Alert.alert("Validation Error", "Quantity must be a positive integer");
-      return false;
+    for (let i = 0; i < formData.length; i++) {
+      const item = formData[i];
+      // Skip empty rows
+      if (!item.itemName.trim() && !item.quantity.trim()) {
+        continue;
+      }
+      // If one is filled, both must be filled
+      if (!item.itemName.trim()) {
+        Alert.alert("Validation Error", `Row ${i + 1}: Item name is required`);
+        return false;
+      }
+      const quantity = Number(item.quantity);
+      if (
+        !item.quantity.trim() ||
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        Alert.alert(
+          "Validation Error",
+          `Row ${i + 1}: Quantity must be a positive integer`,
+        );
+        return false;
+      }
     }
     return true;
   };
 
   const handleClear = () => {
-    setFormData({ itemName: "", quantity: "" });
+    setFormData([
+      { itemName: "", quantity: "" },
+      { itemName: "", quantity: "" },
+      { itemName: "", quantity: "" },
+      { itemName: "", quantity: "" },
+      { itemName: "", quantity: "" },
+    ]);
   };
 
   const handleSave = async () => {
@@ -141,58 +188,18 @@ export default function AddItemScreen() {
 
     setLoading(true);
     try {
-      const quantity = Number(formData.quantity);
-      if (isEditing && itemId && typeof itemId === "string") {
-        // Get original item for quantity difference
-        const allItems = await storage.getItems();
-        const originalItem = allItems.find((i) => i.id === itemId);
-        const originalQuantity = originalItem?.quantity || 0;
-        const quantityDifference = quantity - originalQuantity;
-
-        // Update item
-        await storage.updateItem(itemId, {
-          itemName: formData.itemName.trim(),
-          quantity,
-        });
-
-        // If in unload mode, update godown stock with quantity difference
-        if (source === "unload" && company && quantityDifference !== 0) {
-          // Find existing godown stock entry for this item
-          const godownStocks = await storage.getGodownStocks(itemId);
-          const existingStock = godownStocks.find(
-            (s) => s.godownName === company.godownName,
-          );
-
-          if (existingStock) {
-            // Update existing stock entry by deleting and recreating with new quantity
-            await storage.deleteGodownStock(existingStock.id);
-            await storage.addGodownStock({
-              itemId: itemId,
-              godownName: company.godownName,
-              loadedQuantity: quantity, // Use new total quantity
-              vehicleNumber: existingStock.vehicleNumber,
-              date: existingStock.date,
-            });
-          } else if (quantityDifference > 0) {
-            // If no existing stock but quantity increased, add new stock entry
-            await storage.addGodownStock({
-              itemId: itemId,
-              godownName: company.godownName,
-              loadedQuantity: quantityDifference,
-              vehicleNumber: "Received",
-              date: company.date,
-            });
-          }
+      for (const item of formData) {
+        // Skip empty rows
+        if (!item.itemName.trim() || !item.quantity.trim()) {
+          continue;
         }
 
-        Alert.alert("Success", "Item updated successfully", [
-          { text: "OK", onPress: () => router.back() },
-        ]);
-      } else {
+        const quantity = Number(item.quantity);
+
         // Add new item
         const newItem = await storage.addItem({
           companyId,
-          itemName: formData.itemName.trim(),
+          itemName: item.itemName.trim(),
           quantity,
         });
 
@@ -201,26 +208,26 @@ export default function AddItemScreen() {
           await storage.addGodownStock({
             itemId: newItem.id,
             godownName: company.godownName,
-            loadedQuantity: quantity, // Positive: stock entering godown
+            loadedQuantity: quantity,
             vehicleNumber: "Received",
             date: company.date,
           });
         }
-
-        Alert.alert("Success", "Item added successfully", [
-          {
-            text: "Add More",
-            onPress: () => handleClear(),
-          },
-          {
-            text: "Done",
-            onPress: () => router.back(),
-            style: "cancel",
-          },
-        ]);
       }
+
+      Alert.alert("Success", "Items added successfully", [
+        {
+          text: "Add More",
+          onPress: () => handleClear(),
+        },
+        {
+          text: "Done",
+          onPress: () => router.back(),
+          style: "cancel",
+        },
+      ]);
     } catch (error) {
-      Alert.alert("Error", "Failed to save item. Please try again.");
+      Alert.alert("Error", "Failed to save items. Please try again.");
       console.error(error);
     } finally {
       setLoading(false);
@@ -229,55 +236,61 @@ export default function AddItemScreen() {
 
   return (
     <AppLayout
-      title={
-        isEditing
-          ? "Edit Item"
-          : `Add Item for ${company?.companyName || companyName || "Company"}`
-      }
+      title={`Add Items for ${company?.companyName || companyName || "Company"}`}
       isHome={false}
     >
-      <View style={styles.container}>
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Item Name *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter item name"
-            placeholderTextColor={colors.textSecondary}
-            value={formData.itemName}
-            onChangeText={(value) => handleInputChange("itemName", value)}
-            editable={!loading}
-            autoFocus={!isEditing}
-            onFocus={() => {
-              if (itemSuggestions.length > 0) setShowItemSuggestions(true);
-            }}
-          />
-          {showItemSuggestions && itemSuggestions.length > 0 && (
-            <View style={styles.autocompleteContainer}>
-              {itemSuggestions.map((name) => (
-                <TouchableOpacity
-                  key={name}
-                  style={styles.autocompleteOption}
-                  onPress={() => handleSelectItemSuggestion(name)}
-                >
-                  <Text style={styles.autocompleteOptionText}>{name}</Text>
-                </TouchableOpacity>
-              ))}
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {formData.map((item, index) => (
+          <View key={index} style={styles.card}>
+            <View style={styles.fieldContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter item name"
+                placeholderTextColor={colors.textSecondary}
+                value={item.itemName}
+                onChangeText={(value) =>
+                  handleInputChange(index, "itemName", value)
+                }
+                editable={!loading}
+                autoFocus={index === 0 && !isEditing}
+                onFocus={() => {
+                  if (itemSuggestions.length > 0) {
+                    const newShow = [...showItemSuggestions];
+                    newShow[index] = true;
+                    setShowItemSuggestions(newShow);
+                  }
+                }}
+              />
+              {showItemSuggestions[index] && itemSuggestions.length > 0 && (
+                <View style={styles.autocompleteContainer}>
+                  {itemSuggestions.map((name) => (
+                    <TouchableOpacity
+                      key={name}
+                      style={styles.autocompleteOption}
+                      onPress={() => handleSelectItemSuggestion(index, name)}
+                    >
+                      <Text style={styles.autocompleteOptionText}>{name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Quantity *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter quantity"
-            placeholderTextColor={colors.textSecondary}
-            value={formData.quantity}
-            onChangeText={(value) => handleInputChange("quantity", value)}
-            keyboardType="numeric"
-            editable={!loading}
-          />
-        </View>
+            <View style={styles.fieldContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter quantity"
+                placeholderTextColor={colors.textSecondary}
+                value={item.quantity}
+                onChangeText={(value) =>
+                  handleInputChange(index, "quantity", value)
+                }
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
+          </View>
+        ))}
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -285,7 +298,7 @@ export default function AddItemScreen() {
             onPress={handleClear}
             disabled={loading}
           >
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <Text style={styles.clearButtonText}>Clear All</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -298,29 +311,37 @@ export default function AddItemScreen() {
             disabled={loading}
           >
             <Text style={styles.saveButtonText}>
-              {loading
-                ? isEditing
-                  ? "Updating..."
-                  : "Saving..."
-                : isEditing
-                  ? "Update Item"
-                  : "Save Item"}
+              {loading ? "Saving..." : "Save Items"}
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  fieldContainer: { marginBottom: 20 },
+  card: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 5,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  fieldContainer: { marginBottom: 5 },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
     color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   input: {
     borderWidth: 1,
@@ -336,6 +357,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: -16,
+    marginBottom: -16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,

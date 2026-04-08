@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,24 +15,40 @@ import {
   View,
 } from "react-native";
 
+interface CompanyFormData {
+  companyName: string;
+  agentName: string;
+  godownName: string;
+  date: Date;
+}
+
 export default function AddCompanyScreen() {
   const router = useRouter();
   const { partyId, companyId, source = "add" } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
   const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [showGodownDropdown, setShowGodownDropdown] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showGodownDropdown, setShowGodownDropdown] = useState<boolean[]>([
+    false,
+    false,
+    false,
+  ]);
+  const [showDatePicker, setShowDatePicker] = useState<boolean[]>([
+    false,
+    false,
+    false,
+  ]);
   const [isEditing] = useState(!!companyId);
   const [allCompanyNames, setAllCompanyNames] = useState<string[]>([]);
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
-  const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+  const [showCompanySuggestions, setShowCompanySuggestions] = useState<
+    boolean[]
+  >([false, false, false]);
   const [originalCompany, setOriginalCompany] = useState<Company | null>(null);
-  const [formData, setFormData] = useState({
-    companyName: "",
-    agentName: "",
-    godownName: "",
-    date: new Date(),
-  });
+  const [formData, setFormData] = useState<CompanyFormData[]>([
+    { companyName: "", agentName: "", godownName: "", date: new Date() },
+    { companyName: "", agentName: "", godownName: "", date: new Date() },
+    { companyName: "", agentName: "", godownName: "", date: new Date() },
+  ]);
 
   useEffect(() => {
     loadGodowns();
@@ -68,12 +85,8 @@ export default function AddCompanyScreen() {
       const company = companies.find((c) => c.id === id);
       if (company) {
         setOriginalCompany(company);
-        setFormData({
-          companyName: company.companyName,
-          agentName: company.agentName || "",
-          godownName: company.godownName,
-          date: new Date(company.date),
-        });
+        // Since we're now in multi-add mode, we don't pre-fill for editing
+        console.log("Company loaded:", company);
       }
     } catch (error) {
       Alert.alert("Error", "Failed to load company data");
@@ -81,7 +94,11 @@ export default function AddCompanyScreen() {
     }
   };
 
-  const handleInputChange = (field: string, value: string | Date) => {
+  const handleInputChange = (
+    index: number,
+    field: string,
+    value: string | Date,
+  ) => {
     if (field === "companyName" && typeof value === "string") {
       const updated = value.trimStart();
       const matches = allCompanyNames.filter(
@@ -90,55 +107,92 @@ export default function AddCompanyScreen() {
           name.toLowerCase() !== updated.toLowerCase(),
       );
       setCompanySuggestions(matches);
-      setShowCompanySuggestions(matches.length > 0 && updated.length > 0);
-      setFormData((prev) => ({ ...prev, companyName: updated }));
+      const newShowSuggestions = [...showCompanySuggestions];
+      newShowSuggestions[index] = matches.length > 0 && updated.length > 0;
+      setShowCompanySuggestions(newShowSuggestions);
+      setFormData((prev) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], companyName: value.trimStart() };
+        return updated;
+      });
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
-  const handleGodownSelect = (godown: Godown) => {
-    setFormData((prev) => ({ ...prev, godownName: godown.name }));
-    setShowGodownDropdown(false);
+  const handleGodownSelect = (index: number, godown: Godown) => {
+    setFormData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], godownName: godown.name };
+      return updated;
+    });
+    const newShowGodownDropdown = [...showGodownDropdown];
+    newShowGodownDropdown[index] = false;
+    setShowGodownDropdown(newShowGodownDropdown);
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === "ios");
+  const handleDateChange = (index: number, event: any, selectedDate?: Date) => {
+    const newShowDatePicker = [...showDatePicker];
+    newShowDatePicker[index] = Platform.OS === "ios";
+    setShowDatePicker(newShowDatePicker);
     if (selectedDate) {
-      handleInputChange("date", selectedDate);
+      handleInputChange(index, "date", selectedDate);
     }
   };
 
   const handleClear = () => {
-    setFormData({
-      companyName: "",
-      agentName: "",
-      godownName: "",
-      date: new Date(),
-    });
-    setShowGodownDropdown(false);
-    setShowDatePicker(false);
-    setShowCompanySuggestions(false);
+    setFormData([
+      { companyName: "", agentName: "", godownName: "", date: new Date() },
+      { companyName: "", agentName: "", godownName: "", date: new Date() },
+      { companyName: "", agentName: "", godownName: "", date: new Date() },
+    ]);
+    setShowGodownDropdown([false, false, false]);
+    setShowDatePicker([false, false, false]);
+    setShowCompanySuggestions([false, false, false]);
   };
 
-  const handleSelectCompanySuggestion = (companyName: string) => {
-    setFormData((prev) => ({ ...prev, companyName }));
+  const handleSelectCompanySuggestion = (
+    index: number,
+    companyName: string,
+  ) => {
+    setFormData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], companyName };
+      return updated;
+    });
     setCompanySuggestions([]);
-    setShowCompanySuggestions(false);
+    const newShowSuggestions = [...showCompanySuggestions];
+    newShowSuggestions[index] = false;
+    setShowCompanySuggestions(newShowSuggestions);
   };
 
   const validateForm = (): boolean => {
-    if (!formData.companyName.trim()) {
-      Alert.alert("Validation Error", "Company name is required");
-      return false;
-    }
-    if (!formData.godownName.trim()) {
-      Alert.alert("Validation Error", "Godown name is required");
-      return false;
+    for (let i = 0; i < formData.length; i++) {
+      const company = formData[i];
+      // Skip empty rows
+      if (!company.companyName.trim() && !company.godownName.trim()) {
+        continue;
+      }
+      // If one is filled, required fields must be filled
+      if (!company.companyName.trim()) {
+        Alert.alert(
+          "Validation Error",
+          `Row ${i + 1}: Company name is required`,
+        );
+        return false;
+      }
+      if (!company.godownName.trim()) {
+        Alert.alert(
+          "Validation Error",
+          `Row ${i + 1}: Godown name is required`,
+        );
+        return false;
+      }
     }
     return true;
   };
@@ -152,83 +206,39 @@ export default function AddCompanyScreen() {
 
     setLoading(true);
     try {
-      if (isEditing && companyId && typeof companyId === "string") {
-        // Check if godown changed
-        const godownChanged =
-          originalCompany && originalCompany.godownName !== formData.godownName;
-
-        // Update existing company
-        await storage.updateCompany(companyId, {
-          companyName: formData.companyName.trim(),
-          agentName: formData.agentName.trim() || undefined,
-          godownName: formData.godownName.trim(),
-          date: formData.date.toISOString().split("T")[0],
-        });
-
-        // If godown changed, update all GodownStock entries
-        if (godownChanged && originalCompany) {
-          // Get all items for this company
-          const allItems = await storage.getItems();
-          const companyItems = allItems.filter(
-            (item) => item.companyId === companyId,
-          );
-
-          // For each item, move GodownStock from old godown to new godown
-          for (const item of companyItems) {
-            const godownStocks = await storage.getGodownStocks(item.id);
-            const oldGodownStocks = godownStocks.filter(
-              (s) => s.godownName === originalCompany.godownName,
-            );
-
-            for (const stock of oldGodownStocks) {
-              // Delete old godown stock entry
-              await storage.deleteGodownStock(stock.id);
-              // Create new godown stock entry with same quantity
-              await storage.addGodownStock({
-                itemId: item.id,
-                godownName: formData.godownName,
-                loadedQuantity: stock.loadedQuantity,
-                vehicleNumber: stock.vehicleNumber,
-                date: stock.date,
-              });
-            }
-          }
+      for (const company of formData) {
+        // Skip empty rows
+        if (!company.companyName.trim() || !company.godownName.trim()) {
+          continue;
         }
 
-        await loadCompanyNames();
-        Alert.alert("Success", "Company updated successfully", [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ]);
-      } else {
         // Add new company
         await storage.addCompany({
           partyId,
-          companyName: formData.companyName.trim(),
-          agentName: formData.agentName.trim() || undefined,
-          godownName: formData.godownName.trim(),
-          date: formData.date.toISOString().split("T")[0],
+          companyName: company.companyName.trim(),
+          agentName: company.agentName.trim() || undefined,
+          godownName: company.godownName.trim(),
+          date: company.date.toISOString().split("T")[0],
           source: source as "add" | "unload",
         });
-        await loadCompanyNames();
-        Alert.alert("Success", "Company added successfully", [
-          {
-            text: "Add More",
-            onPress: () => {
-              handleClear();
-            },
-          },
-          {
-            text: "Done",
-            onPress: () => router.back(),
-            style: "cancel",
-          },
-        ]);
       }
+
+      await loadCompanyNames();
+      Alert.alert("Success", "Companies added successfully", [
+        {
+          text: "Add More",
+          onPress: () => {
+            handleClear();
+          },
+        },
+        {
+          text: "Done",
+          onPress: () => router.back(),
+          style: "cancel",
+        },
+      ]);
     } catch (error) {
-      Alert.alert("Error", "Failed to save company. Please try again.");
+      Alert.alert("Error", "Failed to save companies. Please try again.");
       console.error(error);
     } finally {
       setLoading(false);
@@ -236,119 +246,136 @@ export default function AddCompanyScreen() {
   };
 
   return (
-    <AppLayout
-      title={isEditing ? "Edit Company" : "Add Company"}
-      isHome={false}
-    >
-      <View style={styles.container}>
-        <View style={styles.content}>
-          {/* Company Name Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Company Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter company name"
-              placeholderTextColor={colors.textSecondary}
-              value={formData.companyName}
-              onChangeText={(value) => handleInputChange("companyName", value)}
-              editable={!loading}
-              autoFocus={true}
-              onFocus={() => {
-                if (companySuggestions.length > 0)
-                  setShowCompanySuggestions(true);
-              }}
-            />
-            {showCompanySuggestions && companySuggestions.length > 0 && (
-              <View style={styles.autocompleteContainer}>
-                {companySuggestions.map((name) => (
-                  <TouchableOpacity
-                    key={name}
-                    style={styles.autocompleteOption}
-                    onPress={() => handleSelectCompanySuggestion(name)}
-                  >
-                    <Text style={styles.autocompleteOptionText}>{name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Agent Name Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Agent Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter agent name (optional)"
-              placeholderTextColor={colors.textSecondary}
-              value={formData.agentName}
-              onChangeText={(value) => handleInputChange("agentName", value)}
-              editable={!loading}
-            />
-          </View>
-
-          {/* Godown Name Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Godown Name *</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowGodownDropdown(!showGodownDropdown)}
-              disabled={loading}
-            >
-              <Text style={styles.dropdownButtonText}>
-                {formData.godownName || "Select godown"}
-              </Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </TouchableOpacity>
-            {showGodownDropdown && (
-              <View style={styles.dropdownMenu}>
-                {godowns.map((godown) => (
-                  <TouchableOpacity
-                    key={godown.id}
-                    style={[
-                      styles.dropdownOption,
-                      formData.godownName === godown.name &&
-                        styles.dropdownOptionSelected,
-                    ]}
-                    onPress={() => handleGodownSelect(godown)}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownOptionText,
-                        formData.godownName === godown.name &&
-                          styles.dropdownOptionTextSelected,
-                      ]}
-                    >
-                      {godown.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Date Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Date *</Text>
-            <TouchableOpacity
-              style={styles.input}
-              onPress={() => setShowDatePicker(true)}
-              disabled={loading}
-            >
-              <Text style={{ color: colors.textPrimary }}>
-                {formData.date.toDateString()}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={formData.date}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-                maximumDate={new Date()}
+    <AppLayout title="Add Companies" isHome={false}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {formData.map((company, index) => (
+          <View key={index} style={styles.card}>
+            {/* Company Name Field */}
+            <View style={styles.fieldContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter company name"
+                placeholderTextColor={colors.textSecondary}
+                value={company.companyName}
+                onChangeText={(value) =>
+                  handleInputChange(index, "companyName", value)
+                }
+                editable={!loading}
+                autoFocus={index === 0}
+                onFocus={() => {
+                  if (companySuggestions.length > 0) {
+                    const newShow = [...showCompanySuggestions];
+                    newShow[index] = true;
+                    setShowCompanySuggestions(newShow);
+                  }
+                }}
               />
-            )}
+              {showCompanySuggestions[index] &&
+                companySuggestions.length > 0 && (
+                  <View style={styles.autocompleteContainer}>
+                    {companySuggestions.map((name) => (
+                      <TouchableOpacity
+                        key={name}
+                        style={styles.autocompleteOption}
+                        onPress={() =>
+                          handleSelectCompanySuggestion(index, name)
+                        }
+                      >
+                        <Text style={styles.autocompleteOptionText}>
+                          {name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+            </View>
+
+            {/* Agent Name Field */}
+            <View style={styles.fieldContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter agent name (optional)"
+                placeholderTextColor={colors.textSecondary}
+                value={company.agentName}
+                onChangeText={(value) =>
+                  handleInputChange(index, "agentName", value)
+                }
+                editable={!loading}
+              />
+            </View>
+
+            {/* Godown Name Field */}
+            <View style={styles.fieldContainer}>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => {
+                  const newShow = [...showGodownDropdown];
+                  newShow[index] = !newShow[index];
+                  setShowGodownDropdown(newShow);
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {company.godownName || "Select godown"}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </TouchableOpacity>
+              {showGodownDropdown[index] && (
+                <View style={styles.dropdownMenu}>
+                  {godowns.map((godown) => (
+                    <TouchableOpacity
+                      key={godown.id}
+                      style={[
+                        styles.dropdownOption,
+                        company.godownName === godown.name &&
+                          styles.dropdownOptionSelected,
+                      ]}
+                      onPress={() => handleGodownSelect(index, godown)}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownOptionText,
+                          company.godownName === godown.name &&
+                            styles.dropdownOptionTextSelected,
+                        ]}
+                      >
+                        {godown.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Date Field */}
+            <View style={styles.fieldContainer}>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => {
+                  const newShow = [...showDatePicker];
+                  newShow[index] = true;
+                  setShowDatePicker(newShow);
+                }}
+                disabled={loading}
+              >
+                <Text style={{ color: colors.textPrimary }}>
+                  {company.date.toDateString()}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker[index] && (
+                <DateTimePicker
+                  value={company.date}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) =>
+                    handleDateChange(index, event, selectedDate)
+                  }
+                  maximumDate={new Date()}
+                />
+              )}
+            </View>
           </View>
-        </View>
+        ))}
 
         {/* Footer with Buttons */}
         <View style={styles.footer}>
@@ -357,7 +384,7 @@ export default function AddCompanyScreen() {
             onPress={handleClear}
             disabled={loading}
           >
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <Text style={styles.clearButtonText}>Clear All</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -370,17 +397,11 @@ export default function AddCompanyScreen() {
             disabled={loading}
           >
             <Text style={styles.saveButtonText}>
-              {loading
-                ? isEditing
-                  ? "Updating..."
-                  : "Saving..."
-                : isEditing
-                  ? "Update Company"
-                  : "Save Company"}
+              {loading ? "Saving..." : "Save Companies"}
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </AppLayout>
   );
 }
@@ -388,13 +409,18 @@ export default function AddCompanyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: "column",
+    padding: 16,
   },
-  content: {
-    flex: 1,
+  card: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
   },
   fieldContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   label: {
     fontSize: 14,
@@ -416,6 +442,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: -16,
+    marginBottom: -16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,

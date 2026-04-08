@@ -157,6 +157,125 @@ export default function VehicleCard({
       const parties = await storage.getParties();
       const party = parties.find((p) => p.id === vehicle.partyId);
 
+      // Group items by company
+      const groupedByCompany = new Map<
+        string,
+        {
+          company: Company | null;
+          items: typeof loadedItems;
+          total: number;
+        }
+      >();
+
+      loadedItems.forEach((item) => {
+        const companyId = item.company?.id || "unknown";
+        if (!groupedByCompany.has(companyId)) {
+          groupedByCompany.set(companyId, {
+            company: item.company,
+            items: [],
+            total: 0,
+          });
+        }
+        const group = groupedByCompany.get(companyId)!;
+        group.items.push(item);
+        group.total += item.totalQuantity;
+      });
+
+      let companies = Array.from(groupedByCompany.values());
+
+      // Calculate total quantity
+      const totalQuantity = loadedItems.reduce(
+        (sum, item) => sum + item.totalQuantity,
+        0,
+      );
+
+      // Sort companies by number of items (descending) for better alignment
+      companies.sort((a, b) => b.items.length - a.items.length);
+
+      // Create company summary for first page
+      const companySummaryHTML = companies
+        .map(
+          (company) => `
+        <div class="company-summary-row">
+          <span>${company.company?.companyName || "Unknown"}</span>
+          <span>${company.total}</span>
+        </div>
+      `,
+        )
+        .join("");
+
+      // Create pairs of companies for 2-column layout
+      const companyPairs = [];
+      for (let i = 0; i < companies.length; i += 2) {
+        companyPairs.push({
+          left: companies[i],
+          right: companies[i + 1] || null,
+        });
+      }
+
+      // Generate HTML for 2-column company layout with proper alignment
+      const companiesHTML = companyPairs
+        .map((pair) => {
+          return `
+          <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <!-- Left Company -->
+            <div style="flex: 1; background-color: white; border: 1px solid #ddd; border-radius: 5px; overflow: hidden;">
+              ${
+                pair.left
+                  ? `
+                <div style="background-color: #f8ff00; color: black; padding: 10px; font-weight: bold;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>${pair.left.company?.companyName || "Unknown"}</div>
+                    <div style="font-size: 12px;">${pair.left.total}</div>
+                  </div>
+                  <div style="font-size: 11px; margin-top: 6px; opacity: 0.8; text-align: center;">${pair.left.company?.agentName || ""}</div>
+                </div>
+                ${pair.left.items
+                  .map(
+                    (item) => `
+                  <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ddd; font-size: 12px;">
+                    <span>${item.item?.itemName || "Unknown"}</span>
+                    <span style="font-weight: bold; color: #007AFF;">${item.totalQuantity}</span>
+                  </div>
+                `,
+                  )
+                  .join("")}
+              `
+                  : ""
+              }
+            </div>
+
+            <!-- Right Company -->
+            <div style="flex: 1; background-color: white; border: 1px solid #ddd; border-radius: 5px; overflow: hidden;">
+              ${
+                pair.right
+                  ? `
+                <div style="background-color: #f8ff00; color: black; padding: 10px; font-weight: bold;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>${pair.right.company?.companyName || "Unknown"}</div>
+                    <div style="font-size: 12px;">${pair.right.total}</div>
+                  </div>
+                  <div style="font-size: 11px; margin-top: 6px; opacity: 0.8; text-align: center;">${pair.right.company?.agentName || ""}</div>
+                </div>
+                ${pair.right.items
+                  .map(
+                    (item) => `
+                  <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ddd; font-size: 12px;">
+                    <span>${item.item?.itemName || "Unknown"}</span>
+                    <span style="font-weight: bold; color: #007AFF;">${item.totalQuantity}</span>
+                  </div>
+                `,
+                  )
+                  .join("")}
+              `
+                  : ""
+              }
+            </div>
+          </div>
+        `;
+        })
+        .join("");
+
       // Create HTML content for PDF
       let htmlContent = `
         <html>
@@ -167,6 +286,10 @@ export default function VehicleCard({
                 font-family: Arial, sans-serif;
                 margin: 15px;
                 background-color: #f5f5f5;
+                text-transform: uppercase;
+              }
+              .page-break {
+                page-break-after: always;
               }
               .logo-section {
                 display: flex;
@@ -216,17 +339,68 @@ export default function VehicleCard({
                 margin-right: 8px;
                 flex: 0 0 120px;
               }
+              .detail-value-red{
+                color: #ef4444;
+                font-size: 13px;
+                font-weight: bold;
+              }
               .detail-value {
                 color: #333;
                 font-size: 13px;
               }
-              .section-title {
+              .company-divider {
+                width: 1px;
+                background-color: #333;
+                margin: 0 12px;
+                align-self: stretch;
+              }
+              .company-summary {
+                margin-top: 20px;
+                background-color: white;
+                border: 2px solid #333;
+                border-radius: 5px;
+                overflow: hidden;
+              }
+              .company-summary-header {
+                color: white;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                border-bottom: 2px solid #333;
+              }
+              .company-summary-row {
+                display: flex;
+                align-items: center;
+                padding: 12px;
+                border-bottom: 1px solid #333;
+                font-size: 13px;
+              }
+              .company-summary-row span:first-child {
+                flex: 1;
+              }
+              .company-summary-row span:last-child {
+                text-align: right;
+                min-width: 60px;
                 font-weight: bold;
                 color: #007AFF;
-                font-size: 14px;
-                margin-bottom: 8px;
-                border-bottom: 1px solid #ddd;
-                padding-bottom: 4px;
+              }
+              .company-summary-total {
+                display: flex;
+                align-items: center;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                color: red;
+              }
+              .company-summary-total span:first-child {
+                flex: 1;
+                text-align: right;
+              }
+              .company-summary-total span:last-child {
+                text-align: right;
+                min-width: 60px;
               }
               .items-section {
                 margin-top: 15px;
@@ -239,27 +413,6 @@ export default function VehicleCard({
                 font-weight: bold;
                 margin-bottom: 10px;
                 font-size: 13px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                background-color: white;
-                font-size: 12px;
-              }
-              th {
-                background-color: #f0f0f0;
-                padding: 8px;
-                text-align: left;
-                font-weight: bold;
-                border-bottom: 2px solid #ddd;
-                font-size: 11px;
-              }
-              td {
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-              }
-              tr:nth-child(even) {
-                background-color: #f9f9f9;
               }
               .footer {
                 margin-top: 15px;
@@ -278,6 +431,7 @@ export default function VehicleCard({
             </style>
           </head>
           <body>
+            <!-- PAGE 1 -->
             <!-- Logo Section - Centered -->
             <div class="logo-section">
               <div class="logo">📋</div>
@@ -289,10 +443,11 @@ export default function VehicleCard({
                 ${
                   party
                     ? `
-                  <div class="detail-value">${party.title || "N/A"} - ${party.name || "N/A"}</div>
-                  <div class="detail-value">${party.contact || "N/A"}</div>
-                  <div class="detail-value">${party.city || "N/A"}</div>
-                  <div class="detail-value">${party.address || "N/A"}</div>
+                  <div class="detail-value">TO</div>
+                  <div class="detail-value-red">${party.title || "N/A"} - ${party.name || "N/A"}</div>
+                  <div class="detail-value-red">${party.address || "N/A"}</div>
+                  <div class="detail-value-red">${party.city || "N/A"}</div>
+                  <div class="detail-value-red">${party.contact || "N/A"}</div>
                 `
                     : `
                   <div class="detail-value">No party details available</div>
@@ -328,48 +483,68 @@ export default function VehicleCard({
               </div>
             </div>
 
+            <div class="items-section" style="border: 1px 0px solid  black; ">
+              <div style="margin-left: 15px; margin-bottom: 10px;">SIR,</div>
+              <div style="text-align: center;">PLEASE RECEIVE <span style="font-weight: bold; color: red;">${totalQuantity} NOS </span>ONLY</div>
+            </div>
+
+            <!-- Company Summary Section -->
+            <div class="company-summary">
+              <div class="company-summary-header">
+                <span style="font-weight: bold; color: red;">LOADING DETAILS</span>
+              </div>
+              ${companySummaryHTML}
+              <div class="company-summary-total">
+                <span>TOTAL</span>
+                <span>${totalQuantity}</span>
+              </div>
+            </div>
+
+            <!-- PAGE BREAK -->
+            <div class="page-break"></div>
+
+            <!-- PAGE 2 -->
+            <!-- Details Section: Party Details and Vehicle Details Side by Side -->
+            <div class="details-section" style="margin-top: 40px;">
+              <div class="party-details">
+                ${
+                  party
+                    ? `
+                  <div class="detail-value-red">${party.title || "N/A"} - ${party.name || "N/A"}</div>
+                  <div class="detail-value-red">${party.address || "N/A"}</div>
+                  <div class="detail-value-red">${party.city || "N/A"}</div>
+                `
+                    : `
+                  <div class="detail-value">No party details available</div>
+                `
+                }
+              </div>
+              
+              <div class="vehicle-details">
+                <div class="detail-item">
+                  <span class="detail-label">Date</span>
+                  <span class="detail-value">: ${formatters.date(vehicle.date)}</span>
+                </div>
+                
+                <div class="detail-item">
+                  <span class="detail-label">Vehicle Number</span>
+                  <span class="detail-value">: ${vehicle.vehicleNumber}</span>
+                </div>
+                                
+                <div class="detail-item" style="color: red !important;">
+                  <span class="detail-label" style="color: red !important;">Total</span>
+                  <span class="detail-value" style="color: red !important;">: ${totalQuantity}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Items Section -->
             <div class="items-section">
-              <div class="items-header">LOADED ITEMS</div>
               ${
                 loadedItems.length === 0
                   ? `<div class="empty-message">No items loaded</div>`
-                  : `
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Company</th>
-                      <th>Item</th>
-                      <th>Quantity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${loadedItems
-                      .map(
-                        (item, index) => `
-                      <tr>
-                        <td>${index + 1}</td>
-                        <td>${(item as any).showCompanyName ? item.company?.companyName || "Unknown" : ""}</td>
-                        <td>${item.item?.itemName || "Unknown"}</td>
-                        <td>${item.totalQuantity}</td>
-                      </tr>
-                    `,
-                      )
-                      .join("")}
-                  </tbody>
-                </table>
-              `
+                  : companiesHTML
               }
-            </div>
-
-            <!-- Total and Footer -->
-            <div style="background-color: white; padding: 12px; margin-top: 15px; border-radius: 5px; border: 1px solid #ddd;">
-              <div style="font-weight: bold; color: #333;">Total Items: ${loadedItems.length}</div>
-            </div>
-
-            <div class="footer">
-              <p>Generated on ${new Date().toLocaleString()}</p>
             </div>
           </body>
         </html>

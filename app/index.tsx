@@ -1,9 +1,11 @@
 import { formatters } from "@/lib/formatters";
 import { Godown, GodownStock, storage } from "@/lib/storage";
 import { colors } from "@/theme/color";
+import * as Print from "expo-print";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -74,6 +76,193 @@ export default function Home() {
     }, [loadGodownsWithQuantities]),
   );
 
+  const downloadUnloadStocksPDF = async () => {
+    try {
+      // Fetch all required data
+      const [allStocks, allItems, allCompanies] = await Promise.all([
+        storage.getGodownStocks(),
+        storage.getItems(),
+        storage.getCompanies(),
+      ]);
+
+      // Filter stocks by companies with source = "unload"
+      const unloadCompanyIds = new Set(
+        allCompanies.filter((c) => c.source === "unload").map((c) => c.id),
+      );
+
+      const unloadStocks = allStocks.filter((stock) => {
+        const item = allItems.find((i) => i.id === stock.itemId);
+        return item && unloadCompanyIds.has(item.companyId);
+      });
+
+      console.log("Unload stocks found:", unloadStocks.length);
+      console.log("Unload company IDs:", Array.from(unloadCompanyIds));
+
+      if (unloadStocks.length === 0) {
+        Alert.alert("No Data", "No unload stocks found");
+        return;
+      }
+
+      // Fetch parties for grouping
+      const allParties = await storage.getParties();
+
+      // Group by party
+      const groupedByParty = new Map<
+        string,
+        {
+          partyName: string;
+          total: number;
+        }
+      >();
+
+      // Process each unload stock
+      unloadStocks.forEach((stock) => {
+        const item = allItems.find((i) => i.id === stock.itemId);
+        if (!item) {
+          console.log("Item not found for stock:", stock.itemId);
+          return;
+        }
+
+        const company = allCompanies.find((c) => c.id === item.companyId);
+        if (!company) {
+          console.log("Company not found for item:", item.companyId);
+          return;
+        }
+
+        const party = allParties.find((p) => p.id === company.partyId);
+        if (!party) {
+          console.log("Party not found for company:", company.partyId);
+          return;
+        }
+
+        const partyId = party.id;
+        const partyName = `${party.title || ""} - ${party.name || ""}`.trim();
+
+        if (!groupedByParty.has(partyId)) {
+          groupedByParty.set(partyId, {
+            partyName,
+            total: 0,
+          });
+        }
+
+        const group = groupedByParty.get(partyId)!;
+        group.total += stock.loadedQuantity;
+      });
+
+      console.log("Grouped by party, total parties:", groupedByParty.size);
+      console.log("Grouped parties:", Array.from(groupedByParty.values()));
+
+      // Calculate grand total
+      const grandTotal = Array.from(groupedByParty.values()).reduce(
+        (sum, group) => sum + group.total,
+        0,
+      );
+
+      // Generate party summary rows - explicitly iterate through all parties
+      let partySummaryHTML = "";
+      Array.from(groupedByParty.values()).forEach((group) => {
+        partySummaryHTML += `
+        <div style="display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #333; font-size: 13px;">
+          <span>${group.partyName}</span>
+          <span style="font-weight: bold; color: #007AFF;">${group.total}</span>
+        </div>
+      `;
+      });
+
+      // Create HTML content for PDF
+      const htmlContent = `
+        <html>
+          <head>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body {
+                font-family: Arial, sans-serif;
+                margin: 15px;
+                background-color: #f5f5f5;
+                text-transform: uppercase;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 20px;
+              }
+              .title {
+                font-size: 18px;
+                font-weight: bold;
+                margin-bottom: 10px;
+              }
+              .subtitle {
+                font-size: 12px;
+                color: #666;
+              }
+              .summary-container {
+                background-color: white;
+                border: 2px solid #333;
+                border-radius: 5px;
+                overflow: hidden;
+                margin-top: 20px;
+              }
+              .summary-header {
+                background-color: #007AFF;
+                color: white;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                border-bottom: 2px solid #333;
+              }
+              .summary-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 12px;
+                border-bottom: 1px solid #333;
+                font-size: 13px;
+              }
+              .summary-total {
+                display: flex;
+                justify-content: space-between;
+                padding: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                color: red;
+                border-top: 2px solid #333;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">UNLOAD STOCKS BY PARTY</div>
+              <div class="subtitle">${new Date().toLocaleDateString()}</div>
+            </div>
+
+            <div class="summary-container">
+              <div class="summary-header">
+                <span style="flex: 1;">PARTY NAME</span>
+                <span>TOTAL QUANTITY</span>
+              </div>
+              ${partySummaryHTML}
+              <div class="summary-total">
+                <span>GRAND TOTAL</span>
+                <span>${grandTotal}</span>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Generate PDF
+      await Print.printAsync({
+        html: htmlContent,
+      });
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to generate PDF",
+      );
+    }
+  };
+
   return (
     <>
       <AppLayout
@@ -105,12 +294,21 @@ export default function Home() {
         >
           <Text style={styles.sectionTitle}>Godowns</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => storage.downloadJSON()}
-          style={{ marginBottom: 12 }}
-        >
-          <Text style={{ color: colors.primary }}>Download Data</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            onPress={() => storage.downloadJSON()}
+            style={styles.downloadLink}
+          >
+            <Text style={{ color: colors.primary }}>Download Data</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={downloadUnloadStocksPDF}
+            style={styles.downloadLink}
+          >
+            <Text style={{ color: colors.primary }}>Download Unload PDF</Text>
+          </TouchableOpacity>
+        </View>
 
         {loading ? (
           <View style={styles.loading}>
@@ -228,5 +426,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: colors.textPrimary,
     fontWeight: "bold",
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  downloadLink: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
