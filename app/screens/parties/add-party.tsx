@@ -201,6 +201,7 @@ export default function AddPartyScreen() {
               onChangeText={(value) => handleInputChange("name", value)}
               editable={!loading}
               autoFocus={true}
+              autoCapitalize="characters"
             />
           </View>
 
@@ -216,6 +217,7 @@ export default function AddPartyScreen() {
               multiline
               numberOfLines={8}
               editable={!loading}
+              autoCapitalize="characters"
             />
           </View>
 
@@ -229,6 +231,7 @@ export default function AddPartyScreen() {
               value={formData.city}
               onChangeText={(value) => handleInputChange("city", value)}
               editable={!loading}
+              autoCapitalize="characters"
             />
           </View>
 

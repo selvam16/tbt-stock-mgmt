@@ -59,6 +59,16 @@ export interface GodownStock {
   createdAt: number;
 }
 
+export interface Bill {
+  id: string;
+  companyId: string;
+  isBillable: boolean;
+  details: string;
+  count: string;
+  billDetails: string;
+  createdAt: number;
+}
+
 const DB_FILE = FileSystem.documentDirectory + "stock.json";
 export const storage = {
   async ensureInitialized() {
@@ -73,7 +83,7 @@ export const storage = {
           godowns.push({ id: createId(), name: `KS-${i.toString().padStart(2, '0')}` });
         }
         godowns.push({ id: createId(), name: 'office' });
-        await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
+        await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: [], companies: [], godowns, items: [], vehicles: [], godownStocks: [], bills: [] }));
       } else {
         // Check if it's the old format (array), migrate
         const data = await FileSystem.readAsStringAsync(DB_FILE);
@@ -87,7 +97,7 @@ export const storage = {
             godowns.push({ id: createId(), name: `KS-${i.toString().padStart(2, '0')}` });
           }
           godowns.push({ id: createId(), name: 'office' });
-          await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns, items: [], vehicles: [], godownStocks: [] }));
+          await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify({ parties: parsed, companies: [], godowns, items: [], vehicles: [], godownStocks: [], bills: [] }));
         } else if (!parsed.godowns) {
           // Add godowns if missing
           const godowns = [];
@@ -102,6 +112,7 @@ export const storage = {
           parsed.items = parsed.items || [];
           parsed.vehicles = parsed.vehicles || [];
           parsed.godownStocks = parsed.godownStocks || [];
+          parsed.bills = parsed.bills || [];
           await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(parsed));
         }
       }
@@ -468,6 +479,68 @@ export const storage = {
       return stock;
     } catch (error) {
       console.error("Error updating godown stock:", error);
+      throw error;
+    }
+  },
+
+  async getBills(companyId?: string): Promise<Bill[]> {
+    try {
+      await this.ensureInitialized();
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const bills = db.bills || [];
+      if (companyId) {
+        return bills.filter((b: Bill) => b.companyId === companyId);
+      }
+      return bills;
+    } catch (error) {
+      console.error("Error reading bills:", error);
+      return [];
+    }
+  },
+
+  async addBill(bill: Omit<Bill, "id" | "createdAt">): Promise<Bill> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const newBill: Bill = {
+        ...bill,
+        id: createId(),
+        createdAt: Date.now(),
+      };
+      db.bills = db.bills || [];
+      db.bills.push(newBill);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return newBill;
+    } catch (error) {
+      console.error("Error adding bill:", error);
+      throw error;
+    }
+  },
+
+  async updateBill(id: string, updates: Partial<Bill>): Promise<Bill> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      const index = db.bills.findIndex((b: Bill) => b.id === id);
+      if (index === -1) throw new Error("Bill not found");
+      db.bills[index] = { ...db.bills[index], ...updates };
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+      return db.bills[index];
+    } catch (error) {
+      console.error("Error updating bill:", error);
+      throw error;
+    }
+  },
+
+  async deleteBill(id: string): Promise<void> {
+    try {
+      const data = await FileSystem.readAsStringAsync(DB_FILE);
+      const db = JSON.parse(data);
+      db.bills = (db.bills || []).filter((b: Bill) => b.id !== id);
+      await FileSystem.writeAsStringAsync(DB_FILE, JSON.stringify(db));
+    } catch (error) {
+      console.error("Error deleting bill:", error);
       throw error;
     }
   },

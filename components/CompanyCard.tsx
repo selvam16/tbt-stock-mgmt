@@ -10,6 +10,7 @@ interface CompanyCardProps {
   totalQuantity?: number;
   onDelete: () => void;
   onEdit: () => void;
+  onBill?: () => void;
   source?: "add" | "unload";
   showActions?: boolean;
   vehicleId?: string;
@@ -21,6 +22,7 @@ export default function CompanyCard({
   totalQuantity = 0,
   onDelete,
   onEdit,
+  onBill,
   source = "add",
   showActions = true,
   vehicleId,
@@ -98,12 +100,26 @@ export default function CompanyCard({
       </View>
       {showActions && (
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-            <MaterialIcons name="edit" size={20} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-            <MaterialIcons name="delete" size={20} color="#ef4444" />
-          </TouchableOpacity>
+          {source === "add" && (
+            <>
+              <TouchableOpacity style={styles.billButton} onPress={onBill}>
+                <MaterialIcons name="note-add" size={20} color={colors.load} />
+              </TouchableOpacity>
+            </>
+          )}
+          {source !== "add" && (
+            <>
+              <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+                <MaterialIcons name="edit" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDelete}
+              >
+                <MaterialIcons name="delete" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </TouchableOpacity>
@@ -147,6 +163,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  billButton: {
+    padding: 8,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ffedd5",
+  },
+  viewButton: {
+    padding: 8,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ede9fe",
   },
   deleteButton: {
     padding: 8,

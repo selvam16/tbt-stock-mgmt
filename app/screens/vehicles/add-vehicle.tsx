@@ -192,6 +192,7 @@ export default function AddVehicleScreen() {
               }
               editable={!loading}
               autoFocus={true}
+              autoCapitalize="characters"
             />
           </View>
 
@@ -205,6 +206,7 @@ export default function AddVehicleScreen() {
               value={formData.nameBoard}
               onChangeText={(value) => handleInputChange("nameBoard", value)}
               editable={!loading}
+              autoCapitalize="characters"
             />
           </View>
 
@@ -218,6 +220,7 @@ export default function AddVehicleScreen() {
               value={formData.vehicleType}
               onChangeText={(value) => handleInputChange("vehicleType", value)}
               editable={!loading}
+              autoCapitalize="characters"
             />
           </View>
 
@@ -233,6 +236,7 @@ export default function AddVehicleScreen() {
               multiline
               numberOfLines={4}
               editable={!loading}
+              autoCapitalize="characters"
             />
           </View>
 

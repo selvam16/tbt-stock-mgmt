@@ -141,6 +141,26 @@ export default function VehicleCard({
           };
         },
       );
+
+      // Check if all companies have bills
+      const allBills = await storage.getBills();
+      const companyIds = Array.from(
+        new Set((details as any).map((d: any) => d.company?.id)),
+      ).filter(Boolean);
+
+      const allHaveBills = companyIds.every((companyId) =>
+        allBills.some((bill) => bill.companyId === companyId),
+      );
+
+      if (!allHaveBills) {
+        Alert.alert(
+          "Missing Bill Details",
+          "All companies must have bill details. Please add bill details for all companies first.",
+        );
+        setLoadingDetails(false);
+        return;
+      }
+
       setLoadedItems(details as any);
       setShowModal(true);
     } catch (error) {
@@ -189,20 +209,99 @@ export default function VehicleCard({
         0,
       );
 
-      // Sort companies by number of items (descending) for better alignment
-      companies.sort((a, b) => b.items.length - a.items.length);
+      // Fetch all bills to determine billable status
+      const allBills = await storage.getBills();
 
-      // Create company summary for first page
-      const companySummaryHTML = companies
-        .map(
-          (company) => `
+      // Create a map of company ID to billable status
+      const companyBillableMap = new Map<string, boolean>();
+      const companyDetailsMap = new Map<string, string>();
+
+      companies.forEach((company) => {
+        if (company.company?.id) {
+          const hasBillableItems = allBills.some(
+            (bill) => bill.companyId === company.company?.id && bill.isBillable,
+          );
+          companyBillableMap.set(company.company.id, hasBillableItems);
+
+          // For non-billable companies, collect bill details
+          if (!hasBillableItems) {
+            const nonBillableBills = allBills.filter(
+              (bill) =>
+                bill.companyId === company.company?.id && !bill.isBillable,
+            );
+            if (nonBillableBills.length > 0) {
+              const detailsText = nonBillableBills
+                .map((bill) => bill.details)
+                .join(", ");
+              companyDetailsMap.set(company.company.id, detailsText);
+            }
+          }
+        }
+      });
+
+      // Sort companies: billable first, then non-billable
+      companies.sort((a, b) => {
+        const aIsBillable =
+          companyBillableMap.get(a.company?.id || "") || false;
+        const bIsBillable =
+          companyBillableMap.get(b.company?.id || "") || false;
+
+        if (aIsBillable === bIsBillable) {
+          return b.items.length - a.items.length;
+        }
+        return aIsBillable ? -1 : 1;
+      });
+
+      // Check if we have both billable and non-billable companies
+      const hasBillableCompanies = companies.some(
+        (c) => companyBillableMap.get(c.company?.id || "") || false,
+      );
+      const hasNonBillableCompanies = companies.some(
+        (c) => !(companyBillableMap.get(c.company?.id || "") || false),
+      );
+      const shouldShowSeparator =
+        hasBillableCompanies && hasNonBillableCompanies;
+
+      // Create company summary for first page with separator
+      let companySummaryHTML = "";
+      let addedSeparator = false;
+
+      companies.forEach((company, index) => {
+        const isBillable =
+          companyBillableMap.get(company.company?.id || "") || false;
+
+        // Add separator between billable and non-billable companies
+        if (
+          shouldShowSeparator &&
+          !addedSeparator &&
+          index > 0 &&
+          !isBillable
+        ) {
+          companySummaryHTML += `
+        <div class="company-summary-separator">
+         
+        </div>
+      `;
+          addedSeparator = true;
+        }
+
+        const badgeClass = isBillable
+          ? 'style="background-color: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;"'
+          : "";
+
+        const companyDisplayName = isBillable
+          ? company.company?.companyName || "Unknown"
+          : `${company.company?.companyName || "Unknown"} (${
+              companyDetailsMap.get(company.company?.id || "") || ""
+            })`;
+
+        companySummaryHTML += `
         <div class="company-summary-row">
-          <span>${company.company?.companyName || "Unknown"}</span>
+          <span>${companyDisplayName}</span>
           <span>${company.total}</span>
         </div>
-      `,
-        )
-        .join("");
+      `;
+      });
 
       // Create pairs of companies for 2-column layout
       const companyPairs = [];
@@ -376,6 +475,15 @@ export default function VehicleCard({
                 padding: 12px;
                 border-bottom: 1px solid #333;
                 font-size: 13px;
+              }
+              .company-summary-separator {
+                display: flex;
+                align-items: center;
+                padding: 16px 12px;
+                border-bottom: 2px solid #333;
+                border-top: 2px solid #333;
+                font-size: 12px;
+                background-color: #f9f9f9;
               }
               .company-summary-row span:first-child {
                 flex: 1;

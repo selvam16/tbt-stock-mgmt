@@ -297,6 +297,7 @@ export default function AddCompanyScreen() {
                 }
                 editable={!loading}
                 autoFocus={index === 0}
+                autoCapitalize="characters"
                 onFocus={() => {
                   if (companySuggestions.length > 0) {
                     const newShow = [...showCompanySuggestions];
@@ -336,6 +337,7 @@ export default function AddCompanyScreen() {
                   handleInputChange(index, "agentName", value)
                 }
                 editable={!loading}
+                autoCapitalize="characters"
               />
             </View>
 

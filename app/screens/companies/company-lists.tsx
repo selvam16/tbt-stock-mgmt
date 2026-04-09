@@ -135,6 +135,18 @@ export default function CompaniesScreen() {
     });
   };
 
+  const handleAddBill = (company: Company) => {
+    router.push({
+      pathname: "/screens/companies/add-bill",
+      params: {
+        companyId: company.id,
+        companyName: company.companyName,
+        partyId,
+        source,
+      },
+    });
+  };
+
   const renderCompany = ({ item }: { item: Company }) => (
     <TouchableOpacity
       onPress={() =>
@@ -149,8 +161,9 @@ export default function CompaniesScreen() {
         totalQuantity={companyQuantities[item.id] ?? 0}
         onEdit={() => handleEditCompany(item.id)}
         onDelete={() => handleDeleteCompany(item.id, item.companyName)}
+        onBill={() => handleAddBill(item)}
         source={source as "add" | "unload"}
-        showActions={source !== "add"}
+        showActions={true}
         vehicleId={vehicleId}
         partyId={partyId}
       />

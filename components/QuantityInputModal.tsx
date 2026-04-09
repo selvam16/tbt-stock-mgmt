@@ -81,6 +81,7 @@ export default function QuantityInputModal({
             keyboardType="number-pad"
             maxLength={9}
             autoFocus
+            autoCapitalize="characters"
           />
 
           <View style={styles.buttonContainer}>

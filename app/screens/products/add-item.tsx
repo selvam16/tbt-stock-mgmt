@@ -284,6 +284,7 @@ export default function AddItemScreen() {
                 }
                 editable={!loading}
                 autoFocus={index === 0 && !isEditing}
+                autoCapitalize="characters"
                 onFocus={() => {
                   if (itemSuggestions.length > 0) {
                     const newShow = [...showItemSuggestions];
