@@ -67,7 +67,14 @@ export default function PartyCard({
           {formatters.partyTitle(party.title)}{" "}
           {formatters.partyName(party.name)}
         </Text>
-        <Text style={styles.partyDetail}>📞 {party.contact}</Text>
+        <View style={styles.cityContainer}>
+          <MaterialIcons
+            name="location-city"
+            size={16}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.partyDetail}>{party.city}</Text>
+        </View>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
@@ -95,6 +102,11 @@ const styles = StyleSheet.create({
   },
   partyInfo: {
     flex: 1,
+    gap: 6,
+  },
+  cityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   partyName: {

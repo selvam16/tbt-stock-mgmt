@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -357,31 +358,55 @@ export default function AddCompanyScreen() {
                 </Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
               </TouchableOpacity>
-              {showGodownDropdown[index] && (
-                <View style={styles.dropdownMenu}>
-                  {godowns.map((godown) => (
-                    <TouchableOpacity
-                      key={godown.id}
-                      style={[
-                        styles.dropdownOption,
-                        company.godownName === godown.name &&
-                          styles.dropdownOptionSelected,
-                      ]}
-                      onPress={() => handleGodownSelect(index, godown)}
+              <Modal
+                visible={showGodownDropdown[index]}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => {
+                  const newShow = [...showGodownDropdown];
+                  newShow[index] = false;
+                  setShowGodownDropdown(newShow);
+                }}
+              >
+                <TouchableOpacity
+                  style={styles.dropdownOverlay}
+                  onPress={() => {
+                    const newShow = [...showGodownDropdown];
+                    newShow[index] = false;
+                    setShowGodownDropdown(newShow);
+                  }}
+                  activeOpacity={1}
+                >
+                  <View style={styles.dropdownMenuModal}>
+                    <ScrollView
+                      nestedScrollEnabled={true}
+                      contentContainerStyle={{ flexGrow: 1 }}
                     >
-                      <Text
-                        style={[
-                          styles.dropdownOptionText,
-                          company.godownName === godown.name &&
-                            styles.dropdownOptionTextSelected,
-                        ]}
-                      >
-                        {godown.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                      {godowns.map((godown) => (
+                        <TouchableOpacity
+                          key={godown.id}
+                          style={[
+                            styles.dropdownOption,
+                            company.godownName === godown.name &&
+                              styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => handleGodownSelect(index, godown)}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              company.godownName === godown.name &&
+                                styles.dropdownOptionTextSelected,
+                            ]}
+                          >
+                            {godown.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
             </View>
 
             {/* Date Field */}
@@ -455,9 +480,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
+    zIndex: 0,
   },
   fieldContainer: {
     marginBottom: 12,
+    position: "relative",
+    zIndex: 10,
   },
   label: {
     fontSize: 14,
@@ -541,14 +569,42 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   dropdownMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 6,
     marginTop: 4,
     backgroundColor: colors.card,
     maxHeight: 200,
+    zIndex: 999,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dropdownMenuModal: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    maxHeight: 500,
+    minWidth: 200,
+    width: "80%",
+    overflow: "hidden",
+    alignItems: "stretch",
   },
   dropdownOption: {
+    width: "100%",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,

@@ -162,7 +162,7 @@ export default function AddPartyScreen() {
             </TouchableOpacity>
             {showTitleDropdown && (
               <View style={styles.dropdownMenu}>
-                {["MR", "M/S"].map((option) => (
+                {["M/S", "MR"].map((option) => (
                   <TouchableOpacity
                     key={option}
                     style={[

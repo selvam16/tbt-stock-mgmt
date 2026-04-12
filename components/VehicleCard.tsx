@@ -542,7 +542,7 @@ export default function VehicleCard({
             <!-- PAGE 1 -->
             <!-- Logo Section - Centered -->
             <div class="logo-section">
-              <div class="logo">📋</div>
+              <div class="logo"><img src="assets/images/tbt-logo.png" alt="TBT Logo" style="width: 80px; height: 80px;" /></div>
             </div>
             
             <!-- Details Section: Party Details and Vehicle Details Side by Side -->
