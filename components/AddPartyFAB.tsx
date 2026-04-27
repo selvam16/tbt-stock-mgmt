@@ -19,7 +19,7 @@ export default function AddPartyFAB({ onPress }: AddPartyFABProps) {
   };
 
   return (
-    <View style={{ position: "absolute", bottom: 20, right: 20 }}>
+    <View style={{ position: "absolute", bottom: 80, right: 20 }}>
       <TouchableOpacity
         onPress={handlePress}
         style={{
